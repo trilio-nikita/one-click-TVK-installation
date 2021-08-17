@@ -73,9 +73,7 @@ install_tvk()
       exit 1
   fi
   # Create TrilioVaultManager CR
-  #yq write TVM.yaml spec.trilioVaultAppVersion "$triliovault_manager_version"
   yq eval -i '.spec.trilioVaultAppVersion="'$triliovault_manager_version'" | .spec.trilioVaultAppVersion style="double"' TVM.yaml 2>/dev/null
-  #sed -i "/^\([[:space:]]*trilioVaultAppVersion: \).*/s//\1\"$triliovault_manager_version\"/" TVM.yaml
   kubectl apply -f TVM.yaml >/dev/null 2>/dev/null
   echo "Installing Triliovault manager...."
   runtime="10 minute"
@@ -218,8 +216,6 @@ create_target()
     s3cmd mb s3://$bucket_name 
     #create S3 target
     url="https://$host_base"
-    #url="${url//./\\.}"
-    #url="${url////\\/}"
     yq eval -i '.metadata.name="'$name'"' target.yaml 2>/dev/null
     yq eval -i '.metadata.namespace="'$namespace'"' target.yaml 2>/dev/null
     #yq write --inplace target.yaml metadata.name $name
@@ -229,11 +225,6 @@ create_target()
     yq eval -i '.spec.objectStoreCredentials.secretKey="'$secret_key'" | .spec.objectStoreCredentials.secretKey style="double"' target.yaml 2>/dev/null
     yq eval -i '.spec.objectStoreCredentials.bucketName="'$bucket_name'" | .spec.objectStoreCredentials.bucketName style="double"' target.yaml 2>/dev/null
     yq eval -i '.spec.objectStoreCredentials.region="'$region'" | .spec.objectStoreCredentials.region style="double"' target.yaml 2>/dev/null
-    #sed -i "/^\([[:space:]]*url: \).*/s//\1\"$url\"/" target.yaml
-    #sed -i "/^\([[:space:]]*accessKey: \).*/s//\1\"$access_key\"/" target.yaml
-    #sed -i "/^\([[:space:]]*secretKey: \).*/s//\1\"$secret_key\"/" target.yaml
-    #sed -i "/^\([[:space:]]*bucketName: \).*/s//\1\"$bucket_name\"/" target.yaml
-    #sed -i "/^\([[:space:]]*region: \).*/s//\1\"$region\"/" target.yaml
     kubectl apply -f target.yaml 
   fi
   if [ $option -eq 1 ];then
@@ -251,11 +242,6 @@ create_target()
     yq eval -i '.spec.nfsCredentials.nfsExport="'$nfs_server:$nfs_path'"' nfs_target.yaml 2>/dev/null
     yq eval -i '.spec.nfsCredentials.nfsOptions="'$option'"' nfs_target.yaml 2>/dev/null
     yq eval -i '.spec.thresholdCapacity="'$thresholdCapacity'"' nfs_target.yaml 2>/dev/null
-    #yq write --inplace nfs_target.yaml metadata.name $name
-    #yq write --inplace nfs_target.yaml metadata.namespace $namespace
-    #yq write --inplace nfs_target.yaml spec.nfsCredentials.nfsExport $nfs_server:$nfs_path
-    #yq write --inplace nfs_target.yaml spec.nfsCredentials.nfsOptions $option 
-    #yq write --inplace nfs_target.yaml spec.thresholdCapacity $thresholdCapacity
     kubectl apply -f nfs_target.yaml
   fi
   echo "Creating target..."
@@ -321,9 +307,7 @@ sample_test()
           exit 1
         fi
         yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null	
-	#yq d -i backupplan.yaml spec.backupPlanComponents
 	yq eval -i '.spec.backupPlanComponents.custom[0].matchLabels.app="mysql-qa"' backupplan.yaml 2>/dev/null
-        #yq write --inplace backupplan.yaml spec.backupPlanComponents.custom[0].matchLabels.app mysql-qa
         ;;
       2)
 	#Add bitnami helm repo
@@ -366,11 +350,6 @@ sample_test()
           exit 1
         fi
 	#Deploy the operator UI
-        #sed -i "/^\([[:space:]]*namespace: \).*/s//\1$namespace/" postgres-operator/ui/manifests/deployment.yaml 
-        #sed -i "/^\([[:space:]]*namespace: \).*/s//\1$namespace/" postgres-operator/ui/manifests/ingress.yaml
-        #sed -i "/^\([[:space:]]*namespace: \).*/s//\1$namespace/" postgres-operator/ui/manifests/service.yaml
-        #sed -i "/^\([[:space:]]*namespace: \).*/s//\1$namespace/" postgres-operator/ui/manifests/ui-service-account-rbac.yaml
-	#kubectl apply -k postgres-operator/ui/manifests -n $namespace
 	#Create a Postgres cluster
 	sed -i "/^\([[:space:]]*namespace: \).*/s//\1$namespace/" postgres-operator/manifests/minimal-postgres-manifest.yaml
         kubectl create -f postgres-operator/manifests/minimal-postgres-manifest.yaml -n $namespace
@@ -414,9 +393,7 @@ sample_test()
           exit 1
         fi
         yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
-	#yq d -i backupplan.yaml spec.backupPlanComponents
 	yq eval -i '.spec.backupPlanComponents.helmReleases[0]="mongotest"' backupplan.yaml 2>/dev/null
-        #yq write --inplace backupplan.yaml spec.backupPlanComponents.helmReleases[0] mongotest
 	;;
       *)
     	echo "Wrong choice"
@@ -429,11 +406,6 @@ sample_test()
    yq eval -i '.spec.backupNamespace="'$namespace'"' backupplan.yaml 2>/dev/null
    yq eval -i '.spec.backupConfig.target.name="'$name'"' backupplan.yaml 2>/dev/null
    yq eval -i '.spec.backupConfig.target.namespace="'$target_ns'"' backupplan.yaml 2>/dev/null
-   #yq write --inplace backupplan.yaml metadata.name $bkplan_name
-   #yq write --inplace backupplan.yaml metadata.namespace $namespace
-   #yq write --inplace backupplan.yaml spec.backupNamespace $namespace
-   #yq write --inplace backupplan.yaml spec.backupConfig.target.name $name
-   #yq write --inplace backupplan.yaml spec.backupConfig.target.namespace $target_ns
    echo "Creating backupplan..."
    kubectl apply -f backupplan.yaml -n $namespace
   
@@ -453,9 +425,6 @@ sample_test()
    yq eval -i '.metadata.name="'$bk_name'"' backup.yaml 2>/dev/null
    yq eval -i '.metadata.namespace="'$namespace'"' backup.yaml 2>/dev/null
    yq eval -i '.spec.backupPlan.name="'$bkplan_name'"' backup.yaml 2>/dev/null
-   #yq write --inplace backup.yaml metadata.name $bk_name
-   #yq write --inplace backup.yaml metadata.namespace $namespace
-   #yq write --inplace backup.yaml spec.backupPlan.name $bkplan_name
    echo "Starting backup..."
    kubectl apply -f backup.yaml -n $namespace
 
@@ -488,13 +457,6 @@ sample_test()
      yq eval -i '.spec.source.target.namespace="'$target_ns'"' restore.yaml 2>/dev/null
      yq eval -i '.spec.source.backup.name="'$bk_name'"' restore.yaml 2>/dev/null
      yq eval -i '.spec.source.backup.namespace="'$namespace'"' restore.yaml 2>/dev/null
-     #yq write --inplace restore.yaml metadata.name $rest_name
-     #yq write --inplace restore.yaml metadata.namespace $rest_ns
-     #yq write --inplace restore.yaml spec.restoreNamespace $rest_ns
-     #yq write --inplace restore.yaml spec.source.target.name $name
-     #yq write --inplace restore.yaml spec.source.target.namespace $target_ns
-     #yq write --inplace restore.yaml spec.source.backup.name  $bk_name
-     #yq write --inplace restore.yaml spec.source.backup..namespace $namespace
      echo "Starting restore..."
      kubectl apply -f restore.yaml -n $rest_ns
    else
