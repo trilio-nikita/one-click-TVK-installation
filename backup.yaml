@@ -1,0 +1,10 @@
+apiVersion: triliovault.trilio.io/v1
+kind: Backup
+metadata:
+  name: trilio-test-backup1
+  namespace: trilio-test-backup1
+spec:
+  type: Full
+  scheduleType: Periodic
+  backupPlan:
+    name: trilio-test-backup1

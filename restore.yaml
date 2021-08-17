@@ -1,0 +1,18 @@
+apiVersion: triliovault.trilio.io/v1
+kind: Restore
+metadata:
+  name: trilio-test-restore1
+  namespace: trilio-test-rest2
+spec:
+  backupPlan:
+    name: mysql-helm-backup-plan
+  source:
+    type: Backup
+    backup:
+      namespace: trilio-test-backup1
+      name: trilio-test-backup1
+    target:
+      name: target1
+      namespace: default
+  restoreNamespace: trilio-test-rest2
+  skipIfAlreadyExists: false
