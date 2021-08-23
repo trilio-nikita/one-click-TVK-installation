@@ -39,7 +39,7 @@ preflight_checks()
       echo "There are some failures"
       read  -p "Do you want to proceed?y/n: " proceed_even_PREFLIGHT_fail
     fi
-    if [[ "$proceed_even_PREFLIGHT_fail" != "Y" ]] || [[ "$proceed_even_PREFLIGHT_fail" != "y" ]];then
+    if [[ "$proceed_even_PREFLIGHT_fail" != "Y" ]] && [[ "$proceed_even_PREFLIGHT_fail" != "y" ]];then
       exit 1
     fi
   fi
