@@ -1,7 +1,7 @@
-PREFLIGHT=False
+PREFLIGHT=True
 proceed_even_PREFLIGHT_fail='Y'
-TVK_INSTALL=False
-CONFIGURE_UI=False
+TVK_INSTALL=True
+CONFIGURE_UI=True
 TARGET=True
 SAMPLE_TEST=True
 storage_class=

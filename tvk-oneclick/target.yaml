@@ -1,0 +1,15 @@
+apiVersion: triliovault.trilio.io/v1
+kind: Target
+metadata:
+  name: tvk-target
+  namespace: default
+spec:
+  type: ObjectStore
+  vendor: Other
+  objectStoreCredentials:
+    url: "https://nyc3.digitaloceanspaces.com"
+    accessKey: "FJYJK72CCDOD2NB7P5JB"
+    secretKey: "juXtyjY2QS+yKsX4A2pdZ7Sm105EuWmQ1MVmguHZe5c"
+    bucketName: "tvk-backup-bucket"
+    region: "nyc3"
+  thresholdCapacity: 1000Gi

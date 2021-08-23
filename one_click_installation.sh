@@ -17,26 +17,25 @@ preflight_checks()
   fi
   echo "input_config path is $input_config"
   plugin_url='https://github.com/trilioData/tvk-plugins.git'
-  kubectl krew index add tvk-plugins $plugin_url 2>/dev/null
+  kubectl krew index add tvk-plugins "$plugin_url" 2>/dev/null
   kubectl krew install tvk-plugins/tvk-preflight
-  echo "checking.... $host_name"
-  if  [[ -z ${input_config} ]];then
-    read -p "Provide storageclass to be used for TVK/Application Installation(storageclass with default annotation): " storage_class
+  if  [[ -z "${input_config}" ]];then
+    read  -p "Provide storageclass to be used for TVK/Application Installation(storageclass with default annotation): " storage_class
   fi
   #read -p "Provide storageclass to be used for TVK/Application Installation(storageclass with default annotation): " storage_class
   if [[ -z "$storage_class" ]];then
-    storage_class=`kubectl get storageclass | grep -w '(default)' | awk  '{print $1}'`
+	  storage_class=$(kubectl get storageclass | grep -w '(default)' | awk  '{print $1}')
   fi
-  check=`kubectl tvk-preflight --storageclass $storage_class | tee /dev/tty`
-  check_for_fail=`echo $check | grep  'Some Pre-flight Checks Failed!'`
-  if [[ -z "$ret" ]];then
+  check=$(kubectl tvk-preflight --storageclass "$storage_class" | tee /dev/tty)
+  check_for_fail=$(echo "$check" | grep  'Some Pre-flight Checks Failed!')
+  if [[ -z "$check_for_fail" ]];then
     echo "All preflight checks are done and you can proceed"
   else 
-    if  [[ -z ${input_config} ]];then
+    if  [[ -z "${input_config}" ]];then
       echo "There are some failures"
-      read -p "Do you want to proceed?y/n: " opt
+      read  -p "Do you want to proceed?y/n: " proceed_even_PREFLIGHT_fail
     fi
-    if [[ $proceed_even_PREFLIGHT_fail -ne "Y" ]] || [[ $proceed_even_PREFLIGHT_fail -ne "y" ]];then
+    if [[ "$proceed_even_PREFLIGHT_fail" == "Y" ]] || [[ "$proceed_even_PREFLIGHT_fail" == "y" ]];then
       exit 1
     fi
   fi
@@ -56,8 +55,8 @@ install_tvk()
   helm repo add triliovault http://charts.k8strilio.net/trilio-stable/k8s-triliovault >/dev/null 2>/dev/null
   helm repo update >/dev/null 2>/dev/null
   if  [[ -z ${input_config} ]];then
-    read -p "Please provide the operator version to be installed(2.1.0): " operator_version
-    read -p "Please provide the triliovault manager version(v2.1.1-alpha): " triliovault_manager_version
+    read  -p "Please provide the operator version to be installed(2.1.0): " operator_version
+    read  -p "Please provide the triliovault manager version(v2.1.1-alpha): " triliovault_manager_version
   fi
   if [[ -z "$operator_version" ]];then
     operator_version='2.1.0'
@@ -72,12 +71,12 @@ install_tvk()
 
   runtime="10 minute"
   endtime=$(date -ud "$runtime" +%s)
-  while [[ $(date -u +%s) -le $endtime ]] && ! [[ `kubectl get pods -l release=triliovault-operator 2>/dev/null | grep Running` ]]
+  while [[ $(date -u +%s) -le $endtime ]] && ! [[ $(kubectl get pods -l release=triliovault-operator 2>/dev/null | grep Running) ]]
   do
       echo "........................"
       sleep 10
   done
-  if ! [[ `kubectl get pods -l release=triliovault-operator 2>/dev/null | grep Running` ]]; then
+  if ! [[ $(kubectl get pods -l release=triliovault-operator 2>/dev/null | grep Running) ]]; then
       echo "TVO installation failed"
       exit 1
   fi
@@ -87,18 +86,18 @@ install_tvk()
   echo "Installing Triliovault manager...."
   runtime="10 minute"
   endtime=$(date -ud "$runtime" +%s)
-  while [[ $(date -u +%s) -le $endtime ]] && ! [[ `kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep Running` ]]
+  while [[ $(date -u +%s) -le $endtime ]] && ! [[ $(kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep Running) ]]
   do
     echo "........................"  
     sleep 2
   done
   runtime="10 minute"
   endtime=$(date -ud "$runtime" +%s)
-  while [[ $(date -u +%s) -le $endtime ]] && ! [[ `kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null | grep Running` ]]
+  while [[ $(date -u +%s) -le $endtime ]] && ! [[ $(kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null | grep Running) ]]
   do
       sleep 10
   done
-  if ! [[ `kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep Running` ]] && [[ `kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null | grep Running` ]]; then
+  if ! [[ $(kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep Running) ]] && [[ $(kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null | grep Running) ]]; then
       echo "TVM installation failed"
       exit 1
   fi
@@ -128,11 +127,11 @@ configure_ui()
    echo -e "TVK UI can be accessed using \n1.Loadbalancer \n2.Nodeport \n3.PortForwarding"
    read -p "Please enter option: " ui_access_type
  else
-   if [[ $ui_access_type -eq 'Loadbalancer' ]];then
+   if [[ $ui_access_type == 'Loadbalancer' ]];then
      ui_access_type=1
-   elif [[ $ui_access_type -eq 'Nodeport' ]];then
+   elif [[ $ui_access_type == 'Nodeport' ]];then
      ui_access_type=2
-   elif [[ $ui_access_type -eq 'PortForwarding' ]];then
+   elif [[ $ui_access_type == 'PortForwarding' ]];then
      ui_access_type=3
    else
      echo "Wrong option selected for ui_access_type"
@@ -168,11 +167,11 @@ configure_nodeport_for_tvkui()
   if  [[ -z ${input_config} ]];then
     read -p "Please enter hostname for a cluster: " tvkhost_name
   fi
-  gateway=`kubectl get pods --no-headers=true | awk '/k8s-triliovault-ingress-gateway/{print $1}'`
-  node=`kubectl get pods $gateway -o jsonpath='{.spec.nodeName}'`
-  ip=`kubectl get node trilio-test2-default-pool-8hckg  -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}'`
-  port=`kubectl get svc k8s-triliovault-ingress-gateway  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}'`
-  kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'${tvkhost_name}-tvk.com'"}]}}'
+  gateway=$(kubectl get pods --no-headers=true | awk '/k8s-triliovault-ingress-gateway/{print $1}')
+  node=$(kubectl get pods "$gateway" -o jsonpath='{.spec.nodeName}')
+  ip=$(kubectl get node "$node"  -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}')
+  port=$(kubectl get svc k8s-triliovault-ingress-gateway  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
+  kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}-tvk.com"'"}]}}'
   echo "For accesing UI, create an entry in /etc/hosts file for the IPs like '$ip  $tvkhost_name-tvk.com'"
   echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name-tvk.com:$port"
   echo "For https access, please refer - https://docs.trilio.io/kubernetes/management-console/user-interface/accessing-the-ui" 
@@ -187,13 +186,13 @@ configure_loadbalancer_for_tvkUI()
    read -p "Please enter cluster name: " cluster_name 
  fi
  kubectl patch svc k8s-triliovault-ingress-gateway -p '{"spec": {"type": "LoadBalancer"}}' >/dev/null 2>/dev/null
- val_status=`kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}'`
+ val_status=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}')
  runtime="20 minute"
  endtime=$(date -ud "$runtime" +%s)
  echo "configuring......This may take some time"
  while [[ $(date -u +%s) -le $endtime ]] && [[ $val_status == '{}' ]]
  do
-    val_status=`kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}'` 
+    val_status=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}')
     echo "....................."
     sleep 5
  done
@@ -202,10 +201,10 @@ configure_loadbalancer_for_tvkUI()
     echo "Loadbalancer taking time to get External IP"
     exit 1
  fi
- external_ip=`kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer.ingress[0].ip}'`
- kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'${tvkhost_name}.${domain}'"}]}}' >/dev/null 2>/dev/null
- doctl compute domain records create ${domain} --record-type A --record-name ${tvkhost_name} --record-data ${external_ip} >/dev/null 2>/dev/null
- doctl kubernetes cluster kubeconfig show ${cluster_name} > config_${cluster_name} 
+ external_ip=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer.ingress[0].ip}')
+ kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.${domain}"'"}]}}' >/dev/null 2>/dev/null
+ doctl compute domain records create "${domain}" --record-type A --record-name "${tvkhost_name}" --record-data "${external_ip}" >/dev/null 2>/dev/null
+ doctl kubernetes cluster kubeconfig show "${cluster_name}" > config_"${cluster_name}" 
  link="http://${tvkhost_name}.${domain}/login"
  echo "You can access TVK UI: $link"
  echo "provide config file stored at location: $PWD/config_${cluster_name}"
@@ -254,25 +253,25 @@ create_target()
           host_bucket="%(bucket)s.nyc3.digitaloceanspaces.com"
         fi
         region="$( cut -d '.' -f 1 <<< "$host_base" )"
-        for i in access_key secret_key host_base host_bucket gpg_passphrase
+        for i in access_key secret_key host_base host_bucket gpg_passphrase 
         do
           sed -i "s/^\($i\s*=\s*\).*$/\1${!i}/" s3cfg_config
-          sudo cp s3cfg_config $HOME/.s3cfg 
+          sudo cp s3cfg_config "$HOME"/.s3cfg 
         done
         #create bucket
-        s3cmd mb s3://$bucket_name 
+        s3cmd mb s3://"$bucket_name"
         #create S3 target
         url="https://$host_base"
-        yq eval -i '.metadata.name="'$target_name'"' target.yaml 2>/dev/null
-        yq eval -i '.metadata.namespace="'$target_namespace'"' target.yaml 2>/dev/null
+        yq eval -i '.metadata.name="'"$target_name"'"' target.yaml 2>/dev/null
+        yq eval -i '.metadata.namespace="'"$target_namespace"'"' target.yaml 2>/dev/null
         #yq write --inplace target.yaml metadata.name $name
         #yq write --inplace target.yaml metadata.namespace $namespace
         yq eval -i '.spec.objectStoreCredentials.url="'$url'" | .spec.objectStoreCredentials.url style="double"' target.yaml 2>/dev/null
-        yq eval -i '.spec.objectStoreCredentials.accessKey="'$access_key'" | .spec.objectStoreCredentials.accessKey style="double"' target.yaml 2>/dev/null
-        yq eval -i '.spec.objectStoreCredentials.secretKey="'$secret_key'" | .spec.objectStoreCredentials.secretKey style="double"' target.yaml 2>/dev/null
-        yq eval -i '.spec.objectStoreCredentials.bucketName="'$bucket_name'" | .spec.objectStoreCredentials.bucketName style="double"' target.yaml 2>/dev/null
-        yq eval -i '.spec.objectStoreCredentials.region="'$region'" | .spec.objectStoreCredentials.region style="double"' target.yaml 2>/dev/null
-	yq eval -i '.spec.thresholdCapacity="'$thresholdCapacity'"' target.yaml 2>/dev/null
+        yq eval -i '.spec.objectStoreCredentials.accessKey="'"$access_key"'" | .spec.objectStoreCredentials.accessKey style="double"' target.yaml 2>/dev/null
+        yq eval -i '.spec.objectStoreCredentials.secretKey="'"$secret_key"'" | .spec.objectStoreCredentials.secretKey style="double"' target.yaml 2>/dev/null
+        yq eval -i '.spec.objectStoreCredentials.bucketName="'"$bucket_name"'" | .spec.objectStoreCredentials.bucketName style="double"' target.yaml 2>/dev/null
+        yq eval -i '.spec.objectStoreCredentials.region="'"$region"'" | .spec.objectStoreCredentials.region style="double"' target.yaml 2>/dev/null
+	yq eval -i '.spec.thresholdCapacity="'"$thresholdCapacity"'"' target.yaml 2>/dev/null
         kubectl apply -f target.yaml
 	;;
      1)
@@ -287,11 +286,11 @@ create_target()
         if [[ -z "$nfs_options" ]]; then
           nfs_options='nfsvers=4'
         fi
-        yq eval -i '.metadata.name="'$target_name'"' nfs_target.yaml 2>/dev/null
-        yq eval -i '.metadatanamespace="'$target_namespace'"' nfs_target.yaml 2>/dev/null
-        yq eval -i '.spec.nfsCredentials.nfsExport="'$nfs_server:$nfs_path'"' nfs_target.yaml 2>/dev/null
-        yq eval -i '.spec.nfsCredentials.nfsOptions="'$nfs_options'"' nfs_target.yaml 2>/dev/null
-        yq eval -i '.spec.thresholdCapacity="'$thresholdCapacity'"' nfs_target.yaml 2>/dev/null
+        yq eval -i '.metadata.name="'"$target_name"'"' nfs_target.yaml 2>/dev/null
+        yq eval -i '.metadatanamespace="'"$target_namespace"'"' nfs_target.yaml 2>/dev/null
+        yq eval -i '.spec.nfsCredentials.nfsExport="'"$nfs_server":"$nfs_path"'"' nfs_target.yaml 2>/dev/null
+        yq eval -i '.spec.nfsCredentials.nfsOptions="'"$nfs_options"'"' nfs_target.yaml 2>/dev/null
+        yq eval -i '.spec.thresholdCapacity="'"$thresholdCapacity"'"' nfs_target.yaml 2>/dev/null
         kubectl apply -f nfs_target.yaml
 	;;
     *)
@@ -303,12 +302,12 @@ create_target()
    echo "Creating target..."
    timeout="20 minute"
    endtime=$(date -ud "$timeout" +%s)
-   while [[ $(date -u +%s) -le $endtime ]] && ! [[ `kubectl get target $target_name  -n  $target_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available` ]] && ! [[ `kubectl get target $target_name  -n  $target_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Unavailable` ]]
+   while [[ $(date -u +%s) -le $endtime ]] && ! [[ $(kubectl get target "$target_name" -n  "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep Available) ]] && ! [[ $(kubectl get target "$target_name"  -n  "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep Unavailable) ]]
    do
      echo "........................"
      sleep 10
    done
-   if ! [[ `kubectl get target $target_name  -n  $target_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available` ]]; then
+   if ! [[ $(kubectl get target "$target_name"  -n  "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep Available) ]]; then
      echo "Failed to create target"
      exit 1
    fi
@@ -336,7 +335,7 @@ sample_test()
    if [[ -z "$bk_plan_name" ]]; then
       bk_plan_name="trilio-test-backup"
    fi
-   res=`kubectl get ns $backup_namespace 2>/dev/null`
+   res=$(kubectl get ns $backup_namespace 2>/dev/null)
    if [[ -z "$res" ]]; then
      kubectl create ns $backup_namespace 2>/dev/null
    fi
@@ -348,13 +347,13 @@ sample_test()
      echo -e "Select an the backup way\n1.Label based(MySQL)\n2.Namespace based(Wordpress)\n3.Operator based(Postgres Operator)\n4.Helm based(Mongodb)"
      read -p "Select option: " backup_way
    else
-     if [[ $backup_way -eq "Label_based" ]];then
+     if [[ $backup_way == "Label_based" ]];then
        backup_way=1
-     elif [[ $backup_way -eq "Namespace_based" ]];then
+     elif [[ $backup_way == "Namespace_based" ]];then
        backup_way=2
-     elif [[ $backup_way -eq "Operator_based" ]];then
+     elif [[ $backup_way == "Operator_based" ]];then
        backup_way=3
-     elif [[ $backup_way -eq "Helm_based" ]];then
+     elif [[ $backup_way == "Helm_based" ]];then
        backup_way=4
      else
        echo "Backup way is wrong/not defined"
@@ -368,12 +367,12 @@ sample_test()
         echo "Installing Application"
         timeout="10 minute"
         endtime=$(date -ud "$timeout" +%s)
-        while [[ $(date -u +%s) -le $endtime ]] && ! [[ `kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running` ]]
+	while [[ $(date -u +%s) -le $endtime ]] && ! [[ $(kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running) ]]
         do
 	  echo "........................"
           sleep 10
         done
-        if ! [[ `kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running` ]]; then
+	if ! [[ $(kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running) ]]; then
           echo "Application installation failed"
           exit 1
         fi
@@ -387,12 +386,12 @@ sample_test()
 	echo "Installing Application"
         timeout="10 minute"
         endtime=$(date -ud "$timeout" +%s)
-        while [[ $(date -u +%s) -le $endtime ]] && [[ `kubectl get pod -l  app.kubernetes.io/instance=my-wordpress -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False` ]]
+	while [[ $(date -u +%s) -le $endtime ]] && [[ $(kubectl get pod -l  app.kubernetes.io/instance=my-wordpress -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False) ]]
         do
           echo "........................"
           sleep 10
         done 
-	if [[ `kubectl get pod -l  app.kubernetes.io/instance=my-wordpress -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False` ]];then
+	if [[ $(kubectl get pod -l  app.kubernetes.io/instance=my-wordpress -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False) ]];then
           echo "Wordpress installation failed"
 	  exit 1
 	fi
@@ -411,12 +410,12 @@ sample_test()
 	echo "Installing Postgres pperator..."
         timeout="5 minute"
         endtime=$(date -ud "$timeout" +%s)
-        while [[ $(date -u +%s) -le $endtime ]] && [[ `kubectl get pod -l name=postgres-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False` ]]
+	while [[ $(date -u +%s) -le $endtime ]] && [[ $(kubectl get pod -l name=postgres-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False) ]]
         do
 	  echo "........................"
           sleep 10
         done
-        if [[ `kubectl get pod -l name=postgres-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False` ]];then
+	if [[ $(kubectl get pod -l name=postgres-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False) ]];then
           echo "Postgress operator installation failed"
           exit 1
         fi
@@ -427,12 +426,12 @@ sample_test()
 	timeout="15 minute"
 	echo "Installing Postgres cluster..."
 	endtime=$(date -ud "$timeout" +%s)
-        while [[ $(date -u +%s) -le $endtime ]] && [[ `kubectl get pods -l application=spilo -L spilo-role -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False` ]]
+	while [[ $(date -u +%s) -le $endtime ]] && [[ $(kubectl get pods -l application=spilo -L spilo-role -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False) ]]
         do
 	  echo "........................"
           sleep 10
         done
-        if [[ `kubectl get pods -l application=spilo -L spilo-role -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False` ]];then
+	if [[ $(kubectl get pods -l application=spilo -L spilo-role -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep False) ]];then
           echo "Postgress cluster installation failed"
           exit 1
         fi
@@ -454,12 +453,12 @@ sample_test()
 	echo "Installing App..."
 	timeout="15 minute"
         endtime=$(date -ud "$timeout" +%s)
-        while [[ $(date -u +%s) -le $endtime ]] && [[ `kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].stat" | grep False` ]]
+	while [[ $(date -u +%s) -le $endtime ]] && [[ $(kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].stat" | grep False) ]]
         do
 	  echo "........................"
           sleep 10
         done
-        if [[ `kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].stat" | grep False` ]];then
+	if [[ $(kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].stat" | grep False) ]];then
           echo "Mongodb installation failed"
           exit 1
         fi
@@ -475,19 +474,19 @@ sample_test()
    yq eval -i '.metadata.name="'$bk_plan_name'"' backupplan.yaml 2>/dev/null
    yq eval -i '.metadata.namespace="'$backup_namespace'"' backupplan.yaml 2>/dev/null
    yq eval -i '.spec.backupNamespace="'$backup_namespace'"' backupplan.yaml 2>/dev/null
-   yq eval -i '.spec.backupConfig.target.name="'$target_name'"' backupplan.yaml 2>/dev/null
-   yq eval -i '.spec.backupConfig.target.namespace="'$target_namespace'"' backupplan.yaml 2>/dev/null
+   yq eval -i '.spec.backupConfig.target.name="'"$target_name"'"' backupplan.yaml 2>/dev/null
+   yq eval -i '.spec.backupConfig.target.namespace="'"$target_namespace"'"' backupplan.yaml 2>/dev/null
    echo "Creating backupplan..."
    kubectl apply -f backupplan.yaml -n $backup_namespace
   
    timeout="5 minute"
    endtime=$(date -ud "$timeout" +%s)
-   while [[ $(date -u +%s) -le $endtime ]] && ! [[ `kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available` ]]
+   while [[ $(date -u +%s) -le $endtime ]] && ! [[ $(kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available) ]]
    do
       echo "........................"
       sleep 10
    done
-   if ! [[ `kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available` ]]; then
+   if ! [[ $(kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available) ]]; then
       echo "Backupplan creation failed"
       exit 1
    fi
@@ -502,12 +501,12 @@ sample_test()
 
    timeout="60 minute"
    endtime=$(date -ud "$timeout" +%s)
-   while [[ $(date -u +%s) -le $endtime ]] && ! [[ `kubectl get backup $backup_name -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available` ]] && ! [[ `kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}'  2>/dev/null | grep Failed` ]]
+   while [[ $(date -u +%s) -le $endtime ]] && ! [[ $(kubectl get backup $backup_name -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available) ]] && ! [[ $(kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}'  2>/dev/null | grep Failed) ]]
    do
       echo "........................"
       sleep 5
    done
-   if ! [[ `kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available` ]]; then
+   if ! [[ $(kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Available) ]]; then
       echo "Backup Failed"
       exit 1
    fi
@@ -530,8 +529,8 @@ sample_test()
      yq eval -i '.metadata.name="'$restore_name'"' restore.yaml 2>/dev/null
      yq eval -i '.metadata.namespace="'$restore_namespace'"' restore.yaml 2>/dev/null
      yq eval -i '.spec.restoreNamespace="'$restore_namespace'"' restore.yaml 2>/dev/null
-     yq eval -i '.spec.source.target.name="'$target_name'"' restore.yaml 2>/dev/null
-     yq eval -i '.spec.source.target.namespace="'$target_namespace'"' restore.yaml 2>/dev/null
+     yq eval -i '.spec.source.target.name="'"$target_name"'"' restore.yaml 2>/dev/null
+     yq eval -i '.spec.source.target.namespace="'"$target_namespace"'"' restore.yaml 2>/dev/null
      yq eval -i '.spec.source.backup.name="'$backup_name'"' restore.yaml 2>/dev/null
      yq eval -i '.spec.source.backup.namespace="'$backup_namespace'"' restore.yaml 2>/dev/null
      echo "Starting restore..."
@@ -541,12 +540,12 @@ sample_test()
    fi
    timeout="60 minute"
    endtime=$(date -ud "$timeout" +%s)
-   while [[ $(date -u +%s) -le $endtime ]] && ! [[ `kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Completed` ]] && ! [[ `kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Failed` ]]
+   while [[ $(date -u +%s) -le $endtime ]] && ! [[ $(kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Completed) ]] && ! [[ $(kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Failed) ]]
    do
       echo "........................"
       sleep 5
    done
-   if ! [[ `kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep Completed` ]]; then
+   if ! [[ $(kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep 'Completed') ]]; then
       echo "Restore Failed"
       exit 1
    fi 
@@ -628,7 +627,8 @@ main()
   if [ ${Non_interact} ]
   then
     read -p "Please enter path for config file: " input_config
-    . $input_config
+    # shellcheck source=.input_config
+    source "$(input_config)"
     export input_config=$input_config
   fi
   echo ${PREFLIGHT}
@@ -654,4 +654,4 @@ main()
   fi
     
 }
-main $@
+main "$@"

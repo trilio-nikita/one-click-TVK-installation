@@ -1,0 +1,15 @@
+apiVersion: triliovault.trilio.io/v1
+kind: BackupPlan
+metadata:
+  name: trilio-test-backup
+  namespace: trilio-test-backup
+spec:
+  backupNamespace: trilio-test-backup
+  backupConfig:
+    target:
+      name: tvk-target
+      namespace: default
+  backupPlanComponents:
+    custom:
+      - matchLabels:
+          app: mysql-qa
