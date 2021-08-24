@@ -75,7 +75,7 @@ Arch:
  	kubectl krew uninstall tvk-oneclick
   ```  
 
-## Usage:
+## Usage
 
 --------------------------------------------------------------
 tvk-oneclick - Installs, Configures UI, Create sample backup/restore test
