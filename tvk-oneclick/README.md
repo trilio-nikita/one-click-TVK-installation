@@ -37,7 +37,7 @@ Arch:
         backup.By default, 'Label_based' backup tests on Mysql application,'Namespace_based' tests on
         wordpress,'Operator_based' tests on postgress operator,'Helm_based' tests using mongodb application.
 
-##Ways in which plugin can be executed
+## Ways in which plugin can be executed
 
 - Interactive:
         Plugin asks various input that requires it to perform the mentioned operations 
@@ -77,7 +77,6 @@ Arch:
 
 ## Usage
 
---------------------------------------------------------------
 tvk-oneclick - Installs, Configures UI, Create sample backup/restore test
 Usage:
 kubectl tvk-oneclick [options] [arguments]
@@ -89,7 +88,6 @@ Options:
         -t, --target              Created Target for backup and restore jobs
         -s, --sample_test         Create sample backup and restore jobs
 	-p, --preflight           Checks if all the pre-requisites are satisfied
------------------------------------------------------------------------
 
 
 
