@@ -15,4 +15,4 @@ spec:
       name: tvk-target
       namespace: default
   restoreNamespace: tvk-restore
-  skipIfAlreadyExists: false
+  skipIfAlreadyExists: true
