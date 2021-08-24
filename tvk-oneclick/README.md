@@ -78,17 +78,19 @@ Arch:
 ## Usage
 
 tvk-oneclick - Installs, Configures UI, Create sample backup/restore test
-Usage:
-kubectl tvk-oneclick [options] [arguments]
-Options:
-        -h, --help                show brief help
-        -n, --noninteractive      run script in non-interactive mode.for this you need to provide config file
-        -i, --install_tvk         Installs TVK and it's free trial license.
-        -c, --configure_ui        Configures TVK UI
-        -t, --target              Created Target for backup and restore jobs
-        -s, --sample_test         Create sample backup and restore jobs
-	-p, --preflight           Checks if all the pre-requisites are satisfied
 
+Usage:
+
+kubectl tvk-oneclick [options] 
+
+| Parameter                 | Default       | Description   |
+| :------------------------ |:-------------:| :-------------|
+| --noninteractive          |               |run script in non-interactive mode.for this you need to provide config file
+| --install_tvk             |               |Installs TVK and it's free trial license.
+| --configure_ui            |               |Configures TVK UI.
+| --target                  |		    | Create Target for backup and restore jobs
+| --sample_test		    |		    | Create sample backup and restore jobs
+| --preflight		    |		    | Checks if all the pre-requisites are satisfied
 
 
 ## Examples
