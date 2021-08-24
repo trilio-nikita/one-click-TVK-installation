@@ -81,6 +81,7 @@ install_tvk()
   if  [[ -z ${input_config} ]];then
     read  -p "Please provide the operator version to be installed(2.1.0): " operator_version
     read  -p "Please provide the triliovault manager version(v2.1.1-alpha): " triliovault_manager_version
+    read  -p "if resource exist, still user wants to proceed: " if_resource_exists_still_proceed
   fi
   if [[ -z "$operator_version" ]];then
     operator_version='2.1.0'
@@ -272,6 +273,7 @@ create_target()
           read -p "Target Name: " target_name
           read -p "Target Namespace: " target_namespace
 	  read -p "thresholdCapacity(100gi): " thresholdCapacity
+	  read  -p "if resource exist, still user wants to proceed: " if_resource_exists_still_proceed
         fi
 	if [[ $(kubectl get target $target_name -n $target_namespace 2>/dev/null) ]];
         then
@@ -327,7 +329,8 @@ create_target()
           read -p "namespace: " target_namespace
           read -p "Export Path: " nfs_path
           read -p "NFSoption(nfsvers=4): " nfs_options
-          read -p "thresholdCapacity: " thresholdCapacity 
+          read -p "thresholdCapacity(100gi): " thresholdCapacity
+	  read  -p "if resource exist, still user wants to proceed: " if_resource_exists_still_proceed
 	fi
 	if [[ $(kubectl get target $target_name -n target_namespace 2>/dev/null) ]];
         then
@@ -381,6 +384,7 @@ sample_test()
      read -p "Backupplan name(trilio-test-backup): " bk_plan_name
      read -p "Backup Name(trilio-test-backup): " backup_name
      read -p "Backup Namespace Name(trilio-test-backup): " backup_namespace
+     read  -p "if resource exist, still user wants to proceed: " if_resource_exists_still_proceed
    fi
    if [[ -z "$backup_namespace" ]]; then
       backup_namespace=trilio-test-backup
