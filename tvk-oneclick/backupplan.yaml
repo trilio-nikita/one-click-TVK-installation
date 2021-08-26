@@ -7,9 +7,13 @@ spec:
   backupNamespace: trilio-test-backup
   backupConfig:
     target:
-      name: tvk-target
+      name: triliospacetest
       namespace: default
+    schedulePolicy:
+      incrementalCron:
+        schedule: "* 0 * * *"
+    retentionPolicy:
+      name: sample-policy
   backupPlanComponents:
-    custom:
-      - matchLabels:
-          app: mysql-qa
+    helmReleases:
+      - mongotest
