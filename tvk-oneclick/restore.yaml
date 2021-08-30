@@ -1,7 +1,7 @@
 apiVersion: triliovault.trilio.io/v1
 kind: Restore
 metadata:
-  name: tvk-restore
+  name: trilio-test-label
   namespace: tvk-restore
 spec:
   backupPlan:
@@ -10,9 +10,9 @@ spec:
     type: Backup
     backup:
       namespace: trilio-test-backup
-      name: trilio-test-backup
+      name: trilio-test-label
     target:
-      name: tvk-target
+      name: demo-target
       namespace: default
   restoreNamespace: tvk-restore
   skipIfAlreadyExists: true

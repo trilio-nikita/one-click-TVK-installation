@@ -1,0 +1,225 @@
+
+
+
+
+
+Skipping plugin tvk-preflight installation as it is already installed
+Provide storageclass to be used for TVK/Application Installation(storageclass with default annotation): WARNING: version difference between client (1.21) and server (1.19) exceeds the supported minor version skew of +/-1
+There are some failures
+Do you want to proceed?y/n: Please provide the operator version to be installed(2.1.0): Please provide the triliovault manager version(v2.1.1-alpha): if resource exist, still user wants to proceed: Installing Triliovault operator...
+NAME: triliovault-operator
+LAST DEPLOYED: Thu Aug 26 09:52:10 2021
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+To verify that TrilioVault Operator has started, run:
+
+  kubectl --namespace=default get deployments -l "release=triliovault-operator"
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \
+Triliovault operator is installed
+Installing Triliovault manager....
+ \ | / - \ | / - \
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | /
+TVK Manager is installed
+Installing Freetrial license...
+TVK UI can be accessed using 
+1.Loadbalancer 
+2.Nodeport 
+3.PortForwarding
+Please enter option: Please enter hostname for a cluster: Warning: extensions/v1beta1 Ingress is deprecated in v1.14+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.extensions/k8s-triliovault-ingress-master patched
+For accesing UI, create an entry in /etc/hosts file for the IPs like '143.244.137.130  tvk1-tvk.com'
+After creating an entry,TVK UI can be accessed through http://tvk1-tvk.com:32528
+For https access, please refer - https://docs.trilio.io/kubernetes/management-console/user-interface/accessing-the-ui
+Target can be created on NFS or s3 compatible storage
+1.NFS(default) 
+2.DOKs_S3
+select option: Target Name: NFSserver: namespace: Export Path: NFSoption(nfsvers=4): thresholdCapacity(100gi): if resource exist, still user wants to proceed: The Target "nfs1" is invalid: spec.thresholdCapacity: Invalid value: "": spec.thresholdCapacity in body should match '^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$'
+Creating target...
+ \ | / -
+Target can be created on NFS or s3 compatible storage
+1.NFS(default) 
+2.DOKs_S3
+select option: Target Name: NFSserver: namespace: Export Path: NFSoption(nfsvers=4): 
+Target can be created on NFS or s3 compatible storage
+1.NFS(default) 
+2.DOKs_S3
+select option: Target Name: NFSserver: namespace: Export Path: NFSoption(nfsvers=4): thresholdCapacity(100Gi): if resource exist, still user wants to proceed: target.triliovault.trilio.io/testnfs created
+Creating target...
+ \ | / - \ | / - \ | / - \ | /
+Failed to create target
+
+Target can be created on NFS or s3 compatible storage
+1.NFS(default) 
+2.DOKs_S3
+select option: Target Name: NFSserver: namespace: Export Path: NFSoption(nfsvers=4): thresholdCapacity(100Gi): if resource exist, still user wants to proceed: target.triliovault.trilio.io/testnfs created
+Creating target...
+ \ | / - \ | / - \ | / - \ | /
+Failed to create target
+
+Target can be created on NFS or s3 compatible storage
+1.NFS(default) 
+2.DOKs_S3
+select option: for creation of bucket, please provide input
+Access_key: Secret_key: Host Base(nyc3.digitaloceanspaces.com): Host Bucket(%(bucket)s.nyc3.digitaloceanspaces.com): gpg_passphrase(trilio): Bucket Name: Target Name: Target Namespace: thresholdCapacity(1000Gi): if resource exist, still user wants to proceed: WARNING: Bucket already exists
+target.triliovault.trilio.io/targets3 created
+Creating target...
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / -
+Failed to create target
+
+Please provide the operator version to be installed(2.1.0): Please provide the triliovault manager version(v2.1.1-alpha): if resource exist, still user wants to proceed: TVK operator already exists
+TVK Manager is already exists
+Checking if TVK manager is of required version..
+Installing Triliovault manager....
+
+
+TVK Manager is installed
+Installing Freetrial license...
+
+Please provide the operator version to be installed(2.1.0): Please provide the triliovault manager version(v2.1.1-alpha): if resource exist, still user wants to proceed: Installing Triliovault operator...
+NAME: triliovault-operator
+LAST DEPLOYED: Thu Aug 26 12:30:15 2021
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+To verify that TrilioVault Operator has started, run:
+
+  kubectl --namespace=default get deployments -l "release=triliovault-operator"
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \
+Triliovault operator is installed
+Installing Triliovault manager....
+ \ | /
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / -
+TVK Manager is installed
+Installing Freetrial license...
+
+Target can be created on NFS or s3 compatible storage
+1.NFS(default) 
+2.DOKs_S3
+select option: for creation of bucket, please provide input
+Access_key: Secret_key: Host Base(nyc3.digitaloceanspaces.com): Host Bucket(%(bucket)s.nyc3.digitaloceanspaces.com): gpg_passphrase(trilio): Bucket Name: Target Name: Target Namespace: thresholdCapacity(1000Gi): if resource exist, still user wants to proceed: Bucket 's3://triliospacetest/' created
+target.triliovault.trilio.io/triliospacetest created
+Creating target...
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | /
+Target is Available to use
+
+Please provide the operator version to be installed(2.1.0): Please provide the triliovault manager version(v2.1.1-alpha): if resource exist, still user wants to proceed: TVK operator already exists
+TVK Manager is already exists
+Checking if TVK manager is of required version..
+Installing Triliovault manager....
+
+
+TVK Manager is installed
+Installing Freetrial license...
+
+Target can be created on NFS or s3 compatible storage
+1.NFS(default) 
+2.DOKs_S3
+select option: for creation of bucket, please provide input
+Access_key: Secret_key: Host Base(nyc3.digitaloceanspaces.com): Host Bucket(%(bucket)s.nyc3.digitaloceanspaces.com): gpg_passphrase(trilio): Bucket Name: Target Name: Target Namespace: thresholdCapacity(1000Gi): if resource exist, still user wants to proceed: WARNING: Bucket already exists
+target.triliovault.trilio.io/triliospacetest2 created
+Creating target...
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \
+Target is Available to use
+
+Please provide input for test demo
+Target Name: Target Namespace: Backupplan name(trilio-test-backup): Backup Name(trilio-test-backup): Backup Namespace Name(trilio-test-backup): if resource exist, still user wants to proceed: User can take backup in multiple ways
+Select an the backup way
+1.Label based(MySQL)
+2.Namespace based(Wordpress)
+3.Operator based(Postgres Operator)
+4.Helm based(Mongodb)
+Select option: NAME: mongotest
+LAST DEPLOYED: Thu Aug 26 13:00:49 2021
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+** Please be patient while the chart is being deployed **
+
+MongoDB&reg; can be accessed on the following DNS name(s) and ports from within your cluster:
+
+    mongotest-mongodb.default.svc.cluster.local
+
+To get the root password run:
+
+    export MONGODB_ROOT_PASSWORD=$(kubectl get secret --namespace default mongotest-mongodb -o jsonpath="{.data.mongodb-root-password}" | base64 --decode)
+
+To connect to your database, create a MongoDB&reg; client container:
+
+    kubectl run --namespace default mongotest-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD" --image docker.io/bitnami/mongodb:4.4.8-debian-10-r24 --command -- bash
+
+Then, run the following command:
+    mongo admin --host "mongotest-mongodb" --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
+
+To connect to your database from outside the cluster execute the following commands:
+
+    kubectl port-forward --namespace default svc/mongotest-mongodb 27017:27017 &
+    mongo --host 127.0.0.1 --authenticationDatabase admin -p $MONGODB_ROOT_PASSWORD
+Installing App...
+error: error parsing jsonpath {.items[*].status.conditions[*].stat, unclosed action
+error: error parsing jsonpath {.items[*].status.conditions[*].stat, unclosed action
+Requested application is installed successfully
+Creating backupplan...
+Error from server: error when creating "backupplan.yaml": admission webhook "tvk-mutation.trilio.io" denied the request: [spec.backupConfig.retentionPolicy] policy sample-policy not found
+ \ | / -
+Please provide input for test demo
+Target Name: Target Namespace: Backupplan name(trilio-test-backup): Backup Name(trilio-test-backup): Backup Namespace Name(trilio-test-backup): if resource exist, still user wants to proceed: User can take backup in multiple ways
+Select an the backup way
+1.Label based(MySQL)
+2.Namespace based(Wordpress)
+3.Operator based(Postgres Operator)
+4.Helm based(Mongodb)
+Select option: NAME: mongotest
+LAST DEPLOYED: Thu Aug 26 13:07:37 2021
+NAMESPACE: trilio-test-backup
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+** Please be patient while the chart is being deployed **
+
+MongoDB&reg; can be accessed on the following DNS name(s) and ports from within your cluster:
+
+    mongotest-mongodb.trilio-test-backup.svc.cluster.local
+
+To get the root password run:
+
+    export MONGODB_ROOT_PASSWORD=$(kubectl get secret --namespace trilio-test-backup mongotest-mongodb -o jsonpath="{.data.mongodb-root-password}" | base64 --decode)
+
+To connect to your database, create a MongoDB&reg; client container:
+
+    kubectl run --namespace trilio-test-backup mongotest-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD" --image docker.io/bitnami/mongodb:4.4.8-debian-10-r24 --command -- bash
+
+Then, run the following command:
+    mongo admin --host "mongotest-mongodb" --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
+
+To connect to your database from outside the cluster execute the following commands:
+
+    kubectl port-forward --namespace trilio-test-backup svc/mongotest-mongodb 27017:27017 &
+    mongo --host 127.0.0.1 --authenticationDatabase admin -p $MONGODB_ROOT_PASSWORD
+Installing App...
+error: error parsing jsonpath {.items[*].status.conditions[*].stat, unclosed action
+Requested application is installed successfully
+Creating backupplan...
+policy.triliovault.trilio.io/sample-policy created
+backupplan.triliovault.trilio.io/trilio-test-backup created
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ |
+Backupplan is in Available state
+Starting backup...
+backup.triliovault.trilio.io/trilio-test-backup created
+ \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / -Flag set to run cleanup in non-interactive mode
+
+Please enter path for config file: ./tvk-oneclick: line 753: input_config: command not found
+./tvk-oneclick: line 753: : No such file or directory
+Flag set to run cleanup in non-interactive mode
+
+Please enter path for config file: TVK operator already exists
+TVK Manager is already exists
+Checking if TVK manager is of required version..
+Installing Triliovault manager....

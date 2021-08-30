@@ -1,7 +1,7 @@
 apiVersion: triliovault.trilio.io/v1
 kind: BackupPlan
 metadata:
-  name: trilio-test-backup
+  name: trilio-test-label
   namespace: trilio-test-backup
 spec:
   backupNamespace: trilio-test-backup
@@ -15,5 +15,6 @@ spec:
     retentionPolicy:
       name: sample-policy
   backupPlanComponents:
-    helmReleases:
-      - mongotest
+    custom:
+      - matchLabels:
+          app: mysql-qa

@@ -150,7 +150,7 @@ install_license(){
   pip3 install lxml >/dev/null 2>/dev/null
 
   #install trilio license
-  python3 install_license.py
+  install_license.py
 
 }
 
@@ -183,9 +183,11 @@ configure_ui()
      ;;
    2)
      configure_nodeport_for_tvkui
+     return 0
      ;;
    1)
      configure_loadbalancer_for_tvkUI
+     return 0
      ;;
    *)
      echo "Incorrect choice"
@@ -233,6 +235,12 @@ configure_loadbalancer_for_tvkUI()
  external_ip=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer.ingress[0].ip}')
  kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.${domain}"'"}]}}' >/dev/null 2>/dev/null
  doctl compute domain records create "${domain}" --record-type A --record-name "${tvkhost_name}" --record-data "${external_ip}" >/dev/null 2>/dev/null
+ retCode=$?
+ if [[ retCode -ne 0 ]]; then
+   echo "Failed to create record, please check domain name"
+   exit 1
+ fi
+
  doctl kubernetes cluster kubeconfig show "${cluster_name}" > config_"${cluster_name}" 
  link="http://${tvkhost_name}.${domain}/login"
  echo "You can access TVK UI: $link"
@@ -283,7 +291,7 @@ create_target()
 	  then
 	    exit 1
 	  else
-	    return
+	    return 0
           fi
 	fi
 	if [[ -z "$gpg_passphrase" ]];then
@@ -324,7 +332,7 @@ create_target()
         yq eval -i '.spec.objectStoreCredentials.bucketName="'"$bucket_name"'" | .spec.objectStoreCredentials.bucketName style="double"' target.yaml 2>/dev/null
         yq eval -i '.spec.objectStoreCredentials.region="'"$region"'" | .spec.objectStoreCredentials.region style="double"' target.yaml 2>/dev/null
 	yq eval -i '.spec.thresholdCapacity="'"$thresholdCapacity"'"' target.yaml 2>/dev/null
-        if ! kubectl apply -f target.yaml;then
+        if ! kubectl apply -f target.yaml -n $target_namespace;then
 	  echo "Traget creation failed"
 	  exit 1
         fi
@@ -346,7 +354,7 @@ create_target()
           then
             exit 1
           else
-            return
+            return 0
           fi
         fi
 	if [[ -z "$thresholdCapacity" ]];then
@@ -360,7 +368,7 @@ create_target()
         yq eval -i '.spec.nfsCredentials.nfsExport="'"$nfs_server":"$nfs_path"'"' nfs_target.yaml 2>/dev/null
         yq eval -i '.spec.nfsCredentials.nfsOptions="'"$nfs_options"'"' nfs_target.yaml 2>/dev/null
         yq eval -i '.spec.thresholdCapacity="'"$thresholdCapacity"'"' nfs_target.yaml 2>/dev/null
-        if ! kubectl apply -f nfs_target.yaml;then
+        if ! kubectl apply -f nfs_target.yaml -n $target_namespace;then
 	  echo "Target creation failed"
 	  exit 1
 	fi
@@ -450,6 +458,7 @@ sample_test()
             echo "Application installation failed"
             exit 1
           fi
+	  echo "Requested application is installed successfully"
           yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
           yq eval -i '.spec.backupPlanComponents.custom[0].matchLabels.app="mysql-qa"' backupplan.yaml 2>/dev/null
         fi
@@ -481,65 +490,55 @@ sample_test()
             echo "Wordpress installation failed"
 	    exit 1
 	  fi
+	  echo "Requested application is installed successfully"
 	  yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
 	fi
 	;;
 
       3)
-        sed -i "/^\([[:space:]]*namespace: \).*/s//\1$backup_namespace/" postgres-operator/manifests/configmap.yaml
-        sed -i "/^\([[:space:]]*namespace: \).*/s//\1$backup_namespace/" postgres-operator/manifests/operator-service-account-rbac.yaml
-        sed -i "/^\([[:space:]]*namespace: \).*/s//\1$backup_namespace/" postgres-operator/manifests/postgres-operator.yaml
-        sed -i "/^\([[:space:]]*namespace: \).*/s//\1$backup_namespace/" postgres-operator/manifests/api-service.yaml	
-	kubectl create -f postgres-operator/manifests/configmap.yaml -n $backup_namespace # configuration
-        kubectl create -f postgres-operator/manifests/operator-service-account-rbac.yaml -n $backup_namespace # identity and permissions
-        kubectl create -f postgres-operator/manifests/postgres-operator.yaml  -n $backup_namespace # deployment
-        kubectl create -f postgres-operator/manifests/api-service.yaml  -n $backup_namespace # operator API to be used by UI
-	#check if operator is up and running
-	echo "Installing Postgres pperator..."
-	runtime="10 minute"
+        echo "MySQL operator will require enough resources, else the deployment will fail"
+        helm repo add presslabs https://presslabs.github.io/charts >/dev/null 2>/dev/null
+        errormessage=$(helm install mysql-operator presslabs/mysql-operator -n $backup_namespace 2>&1)
+        if echo $errormessage  | grep -Eq 'Error:|error:'; then
+          echo "Mysql operator Installation failed with error: $errormessage"
+          exit 1
+        fi
+        echo "Installing MySQL Operator..."
+        runtime="10 minute"
         spin='-\|/'
         i=0
         endtime=$(date -ud "$runtime" +%s)
-	while [[ $(date -u +%s) -le $endtime ]] && kubectl get pod -l name=postgres-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
+        while [[ $(date -u +%s) -le $endtime ]] && kubectl get pod -l app=mysql-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
         do
           i=$(( (i+1) %4 ))
           printf "\r %s" "${spin:$i:1}"
           sleep .1
         done
-	if kubectl get pod -l name=postgres-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
-          echo "Postgress operator installation failed"
+        if kubectl get pod -l app=mysql-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
+          echo "MySQL operator installation failed"
           exit 1
         fi
-	#Deploy the operator UI
-	#Create a Postgres cluster
-	sed -i "/^\([[:space:]]*namespace: \).*/s//\1$backup_namespace/" postgres-operator/manifests/minimal-postgres-manifest.yaml
-        kubectl create -f postgres-operator/manifests/minimal-postgres-manifest.yaml -n $backup_namespace
-	runtime="15 minute"
+        #Create a MySQL cluster
+        kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster-secret.yaml -n $backup_namespace
+        kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster.yaml -n $backup_namespace
+        runtime="15 minute"
         spin='-\|/'
         i=0
         endtime=$(date -ud "$runtime" +%s)
-	echo "Installing Postgres cluster..."
-	while [[ $(date -u +%s) -le $endtime ]] && kubectl get pods -l application=spilo -L spilo-role -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
+        echo "Installing MySQL cluster..."
+        sleep 10
+        while [[ $(date -u +%s) -le $endtime ]] && kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
         do
-	  i=$(( (i+1) %4 ))
+          i=$(( (i+1) %4 ))
           printf "\r %s" "${spin:$i:1}"
           sleep .1
         done
-	if kubectl get pods -l application=spilo -L spilo-role -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
-          echo "Postgress cluster installation failed"
+        if kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
+          echo "MySQL cluster installation failed"
           exit 1
         fi
-	echo -e "You can now access the web interface of postgress operator by port forwarding the UI pod (mind the label selector) and enter localhost:8081 in your browser:\nkubectl port-forward svc/postgres-operator-ui 8081:80 -n $backup_namespace"
-	#yq d -i backupplan.yaml spec.backupPlanComponents
-	yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].operatorId="acid-minimal-cluster"' backupplan.yaml 2>/dev/null
-	yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.group="acid.zalan.do" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.group style="double"' backupplan.yaml 2>/dev/null
-	yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.version="v1" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.version style="double"' backupplan.yaml 2>/dev/null
-	yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.kind="postgresql" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.kind style="double"' backupplan.yaml 2>/dev/null
-	yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].objects[0]="acid-minimal-cluster"' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].operatorResourceSelector[0].matchLabels.name="postgres-operator"' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].applicationResourceSelector[0].matchLabels.application="spilo"' backupplan.yaml 2>/dev/null
-	;;
+        ;;
+
       4)
 	if helm list -n $backup_namespace | grep -q -w mongotest
         then
@@ -567,6 +566,7 @@ sample_test()
             echo "Mongodb installation failed"
             exit 1
           fi
+	  echo "Requested application is installed successfully"
           yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
 	  yq eval -i '.spec.backupPlanComponents.helmReleases[0]="mongotest"' backupplan.yaml 2>/dev/null
 	fi
@@ -575,7 +575,6 @@ sample_test()
     	echo "Wrong choice"
         ;;
   esac
-   echo "Requested application is installed successfully"
    #check if backupplan with same name already exists
    if [[ $(kubectl get backupplan $bk_plan_name  -n  $backup_namespace 2>/dev/null) ]];
       then
@@ -592,8 +591,14 @@ sample_test()
      yq eval -i '.spec.backupConfig.target.name="'"$target_name"'"' backupplan.yaml 2>/dev/null
      yq eval -i '.spec.backupConfig.target.namespace="'"$target_namespace"'"' backupplan.yaml 2>/dev/null
      echo "Creating backupplan..."
-     kubectl apply -f policy.yaml -n $backup_namespace 
-     kubectl apply -f backupplan.yaml -n $backup_namespace
+     if ! kubectl apply -f policy.yaml -n $backup_namespace;then
+          echo "Policy creation failed"
+          exit 1
+     fi
+     if ! kubectl apply -f backupplan.yaml -n $backup_namespace;then
+          echo "Backupplan creation failed"
+          exit 1
+     fi
      cmd="kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Unavailable"
      wait_install "10 minute" "$cmd"
      if ! kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Available; then
@@ -618,7 +623,10 @@ sample_test()
      yq eval -i '.spec.backupPlan.name="'$bk_plan_name'"' backup.yaml 2>/dev/null
      yq eval -i '.spec.backupPlan.namespace="'$backup_namespace'"' backup.yaml 2>/dev/null
      echo "Starting backup..."
-     kubectl apply -f backup.yaml -n $backup_namespace
+     if ! kubectl apply -f backup.yaml -n $backup_namespace;then
+          echo "Backup creation failed"
+          exit 1
+     fi
      cmd="kubectl get backup $backup_name -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Failed"
      wait_install "60 minute" "$cmd"
      if ! kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -w Available; then
@@ -660,7 +668,10 @@ sample_test()
        yq eval -i '.spec.source.backup.name="'$backup_name'"' restore.yaml 2>/dev/null
        yq eval -i '.spec.source.backup.namespace="'$backup_namespace'"' restore.yaml 2>/dev/null
        echo "Starting restore..."
-       kubectl apply -f restore.yaml -n $restore_namespace
+       if ! kubectl apply -f restore.yaml -n $restore_namespace;then
+          echo "Restore creation failed"
+          exit 1
+       fi
        cmd="kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Completed -e Failed"
        wait_install "60 minute" "$cmd"
        if ! kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -w 'Completed'; then
