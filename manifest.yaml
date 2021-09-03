@@ -17,7 +17,7 @@ spec:
         - darwin
         - linux
     uri: https://github.com/trilioData/tvk-plugins/releases/download/v1.0.0-rc5/preflight.tar.gz
-    sha256: d1f9ecf8e6bb39fdcaf0824274206825a4d27983f40c32ecbeb8b539e51bd8e1
+    sha256: 7419d40ad7cbcde6b806e47fd4792b2dbd4c9e84a0aa62eb3826e66d395cc876
     bin: tvk-oneclick
     files:
     - from: tvk-oneclick/*
