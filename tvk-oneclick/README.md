@@ -9,6 +9,8 @@ some sample backups and restore.
 1. krew - kubectl-plugin manager. Install from [here](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
 2. kubectl - kubernetes command-line tool. Install from [here](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 3. Helm (version >= 3)
+
+
 **Supported OS and Architectures**:
 
 OS:
