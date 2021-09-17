@@ -18,14 +18,22 @@ preflight_checks()
     echo "Skipping plugin tvk-preflight installation as it is already installed"
   else
     plugin_url='https://github.com/trilioData/tvk-plugins.git'
-    kubectl krew index add tvk-plugins "$plugin_url" >/dev/null 2>/dev/null
-    kubectl krew install tvk-plugins/tvk-preflight >/dev/null  1>/dev/null
+    kubectl krew index add tvk-plugins "$plugin_url" 1>> >(logit) 2>> >(logit)
+    kubectl krew install tvk-plugins/tvk-preflight 1>> >(logit) 2>> >(logit)
+    retcode=$?
+    if [ "$retcode" -ne 0 ];then 
+      echo "Failed to install tvk-plugins/tvk-preflight plugin" 2>> >(logit)
+    fi
   fi 
   if  [[ -z "${input_config}" ]];then
     read -r -p "Provide storageclass to be used for TVK/Application Installation(storageclass with default annotation): " storage_class
   fi
   if [[ -z "$storage_class" ]];then
 	  storage_class=$(kubectl get storageclass | grep -w '(default)' | awk  '{print $1}')
+	  if [[ -z "$storage_class" ]];then
+	    echo "No default storage class found, need one to proceed";
+	    exit 1
+          fi
   fi
   check=$(kubectl tvk-preflight --storageclass "$storage_class" | tee /dev/tty)
   check_for_fail=$(echo "$check" | grep  'Some Pre-flight Checks Failed!')
@@ -44,7 +52,7 @@ preflight_checks()
 
 #This function is use to compare 2 versions
 vercomp () {
-    if [[ $1 == $2 ]]
+    if [[ $1 == "$2" ]]
     then
         return 0
     fi
@@ -83,6 +91,10 @@ wait_install()
   spin='-\|/'
   i=0
   endtime=$(date -ud "$runtime" +%s)
+  if [[ -z ${endtime} ]];then
+    echo "There is some issue with date usage, please check the pre-requsites in README page" 1>> >(logit) 2>> >(logit)
+    echo "Something went wrong..terminating" 2>> >(logit)
+  fi
   val1=$(eval "$2")
   while [[ $(date -u +%s) -le $endtime ]] && [[ "" == "$val1" ]] || [[ "$val1" == '{}' ]]
   do
@@ -97,15 +109,16 @@ wait_install()
 #This module is used to install TVK along with its free trial license
 install_tvk()
 {
-  #Install helm3
-  curl -s https://get.helm.sh/helm-v3.4.0-linux-amd64.tar.gz | tar xz 2>/dev/null
-  ./linux-amd64/helm version >/dev/null 2>/dev/null
-  cp linux-amd64/helm /usr/local/bin/ 2>/dev/null
-
   # Add helm repo and install triliovault-operator chart
-  helm repo add triliovault-operator http://charts.k8strilio.net/trilio-stable/k8s-triliovault-operator >/dev/null 2>/dev/null
-  helm repo add triliovault http://charts.k8strilio.net/trilio-stable/k8s-triliovault >/dev/null 2>/dev/null
-  helm repo update >/dev/null 2>/dev/null
+  helm repo add triliovault-operator http://charts.k8strilio.net/trilio-stable/k8s-triliovault-operator 1>> >(logit) 2>> >(logit)
+  retcode=$?
+  if [ "$retcode" -ne 0 ];then
+    echo "There is some error in helm update,please resolve and try again" 1>> >(logit) 2>> >(logit)
+    echo "Error ading helm repo"
+    exit 1
+  fi
+  helm repo add triliovault http://charts.k8strilio.net/trilio-stable/k8s-triliovault 1>> >(logit) 2>> >(logit) 
+  helm repo update 1>> >(logit) 2>> >(logit)
   if  [[ -z ${input_config} ]];then
     read -r -p "Please provide the operator version to be installed(2.1.0): " operator_version
     read -r -p "Please provide the triliovault manager version(v2.1.1-alpha): " triliovault_manager_version
@@ -120,15 +133,21 @@ install_tvk()
   if [[ -z "$triliovault_manager_version" ]];then
     triliovault_manager_version='v2.1.1-alpha'
   fi
-  get_ns=$(kubectl get svc -A | grep -w triliovault-operator-k8s-triliovault-operator-webhook-service | awk '{print $1}')
+  get_ns=$(kubectl get deployments -l "release=triliovault-operator" -A 2>> >(logit) | awk '{print $1}' | sed -n 2p)
   if [ -z "$get_ns" ];then
     # Install triliovault operator
     echo "Installing Triliovault operator..."
-    helm install triliovault-operator triliovault-operator/k8s-triliovault-operator --version $operator_version 2>/dev/null
+    helm install triliovault-operator triliovault-operator/k8s-triliovault-operator --version $operator_version 2>> >(logit)
+    retcode=$?
+    if [ "$retcode" -ne 0 ];then 
+      echo "There is some error in helm install triliovaul operator,please resolve and try again" 2>> >(logit) 
+      exit 1
+    fi
   else
-    old_operator_version=$(helm list  -n $get_ns | grep k8s-triliovault-operator | awk '{print $9}' | rev  | cut -d- -f1 | rev | sed 's/[a-z-]//g')
+    old_operator_version=$(helm list  -n "$get_ns" | grep k8s-triliovault-operator | awk '{print $9}' | rev  | cut -d- -f1 | rev | sed 's/[a-z-]//g')
+    # shellcheck disable=SC2001
     new_operator_version=$(echo $operator_version | sed 's/[a-z-]//g')
-    vercomp $old_operator_version $new_operator_version
+    vercomp "$old_operator_version" "$new_operator_version"
     ret_val=$?
     if [[ $ret_val != 2 ]];then
       echo "Triliovault operator cannot be upgraded, please check version number"
@@ -140,31 +159,41 @@ install_tvk()
       semver=( ${old_operator_version//./ } )
       major="${semver[0]}"
       minor="${semver[1]}"
-      patch="${semver[2]}"
       sub_ver=${major}.${minor}
       if [[ $sub_ver == 2.0 ]];then
-        helm plugin install https://github.com/trilioData/tvm-helm-plugins >/dev/null 2>/dev/null
+        helm plugin install https://github.com/trilioData/tvm-helm-plugins >/dev/null 1>> >(logit) 2>> >(logit)
 	rel_name=$(helm list | grep k8s-triliovault-operator | awk '{print $1}')
-	helm tvm-upgrade --release=$rel_name --namespace=$get_ns 2>/dev/null
+	helm tvm-upgrade --release="$rel_name" --namespace="$get_ns" 2>> >(logit)
+	retcode=$?
+	if [ "$retcode" -ne 0 ];then 
+	  echo "There is some error in helm tvm-upgrade,please resolve and try again" 2>> >(logit)
+	  exit 1
+        fi
       fi 	
-      helm  upgrade triliovault-operator triliovault-operator/k8s-triliovault-operator --version $operator_version 2>/dev/null
+      helm  upgrade triliovault-operator triliovault-operator/k8s-triliovault-operator --version $operator_version 2>> >(logit)
+      retcode=$?
+      if [ "$retcode" -ne 0 ];then 
+        echo "There is some error in helm upgrade,please resolve and try again" 2>> >(logit)
+	exit 1
+      fi
       sleep 10
     fi
   fi
   cmd="kubectl get pod -l release=triliovault-operator -o 'jsonpath={.items[*].status.conditions[*].status}' | grep -v False"
   wait_install "10 minute" "$cmd"
   if ! kubectl get pods -l release=triliovault-operator 2>/dev/null | grep -q Running;then
-    echo "TVO installation failed"
+    echo "Triliovault operator installation failed"
     exit 1
   fi
-  echo "Triliovault operator is installed"
+  echo "Triliovault operator is running"
   
   #check if TVK manager is installed
   if [[ $(kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null) ]] && [[ $(kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null) ]];then
     #Check if TVM can be upgraded
-    old_tvm_version=$(kubectl get TrilioVaultManager -n $get_ns -o json | grep releaseVersion | awk '{print$2}' | sed 's/[a-z-]//g' |  sed -e 's/^"//' -e 's/"$//')
+    old_tvm_version=$(kubectl get TrilioVaultManager -n "$get_ns" -o json | grep releaseVersion | awk '{print$2}' | sed 's/[a-z-]//g' |  sed -e 's/^"//' -e 's/"$//')
+    # shellcheck disable=SC2001
     new_triliovault_manager_version=$(echo $triliovault_manager_version | sed 's/[a-z-]//g')
-    vercomp $old_tvm_version $new_triliovault_manager_version
+    vercomp "$old_tvm_version" "$new_triliovault_manager_version"
     ret_val=$?
     if [[ $ret_val != 2 ]];then
       echo "TVM cannot be upgraded! Please check version"
@@ -172,12 +201,48 @@ install_tvk()
         exit 1
       fi
       return
+    else
+      if [[ $old_tvm_version == 2.1* ]] && [[ $new_triliovault_manager_version == 2.5* ]];
+      then
+        svc_type=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.spec.type}')
+        if [[ $svc_type == LoadBalancer ]];
+        then
+          get_host=$(kubectl get ingress k8s-triliovault-ingress-master -o 'jsonpath={.spec.rules[0].host}')
+  cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+apiVersion: triliovault.trilio.io/v1
+kind: TrilioVaultManager
+metadata:
+  labels:
+    triliovault: triliovault
+  name: tvm
+spec:
+  trilioVaultAppVersion: ${triliovault_manager_version}
+  componentConfiguration:
+    ingress-controller:
+      service:
+        type: LoadBalancer
+      host: "${get_host}"
+  helmVersion:
+    version: v3
+  applicationScope: Cluster
+EOF
+          retcode=$?
+          if [ "$retcode" -ne 0 ];then
+            echo "There is error upgrading triliovault manager,please resolve and try again" 2>> >(logit)
+            exit 1
+	  else
+	    echo "Triliovault manager upgraded successfully"
+          fi
+          return
+	 fi
+      fi
     fi
+    
   fi
     
   # Create TrilioVaultManager CR
   sleep 10
-  cat <<EOF | kubectl apply -f - &>/dev/null 
+  cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit) 
 apiVersion: triliovault.trilio.io/v1
 kind: TrilioVaultManager
 metadata:
@@ -190,6 +255,11 @@ spec:
     version: v3
   applicationScope: Cluster
 EOF
+  retcode=$?
+  if [ "$retcode" -ne 0 ];then 
+    echo "There is error in installing triliovault manager,please resolve and try again" 2>> >(logit)
+    exit 1
+  fi
   sleep 2
   echo "Installing Triliovault manager...."
   cmd="kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep Running"
@@ -209,10 +279,12 @@ EOF
 install_license(){
   echo "Installing Freetrial license..."
   #Install required packages
-  sudo apt update >/dev/null 2>/dev/null
-  yes | sudo apt install python3-pip >/dev/null 2>/dev/null
-  pip3 install beautifulsoup4 >/dev/null 2>/dev/null
-  pip3 install lxml >/dev/null 2>/dev/null
+  {
+    sudo apt update
+    yes | sudo apt install python3-pip
+    pip3 install beautifulsoup4 
+    pip3 install lxml 
+  } 1>> >(logit) 2>> >(logit)
   cat <<EOF | python3
 #!/usr/bin/python3
 
@@ -291,9 +363,9 @@ configure_nodeport_for_tvkui()
     echo "Not able to find k8s-triliovault-ingress-gateway resource,TVK UI configuration failed"
     exit 1
   fi
-  node=$(kubectl get pods "$gateway" -o jsonpath='{.spec.nodeName}')
-  ip=$(kubectl get node "$node"  -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}')
-  port=$(kubectl get svc k8s-triliovault-ingress-gateway  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
+  node=$(kubectl get pods "$gateway" -o jsonpath='{.spec.nodeName}' 2>> >(logit))
+  ip=$(kubectl get node "$node"  -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}' 2>> >(logit))
+  port=$(kubectl get svc k8s-triliovault-ingress-gateway  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>> >(logit))
   if ! kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}-tvk.com"'"}]}}';then
     echo "TVK UI configuration failed, please check ingress"
     exit 1
@@ -311,11 +383,10 @@ configure_loadbalancer_for_tvkUI()
    read -r -p "Please enter host name  for a cluster: " tvkhost_name
    read -r -p "Please enter cluster name: " cluster_name 
  fi
- if ! kubectl patch svc k8s-triliovault-ingress-gateway -p '{"spec": {"type": "LoadBalancer"}}' >/dev/null 2>/dev/null ; then
+ if ! kubectl patch svc k8s-triliovault-ingress-gateway -p '{"spec": {"type": "LoadBalancer"}}' 1>> >(logit) 2>> >(logit) ; then
    echo "TVK UI configuration failed, please check ingress"
    exit 1
  fi
- kubectl patch svc k8s-triliovault-ingress-gateway -p '{"spec": {"type": "LoadBalancer"}}' >/dev/null 2>/dev/null
  echo "Configuring UI......This may take some time"
  cmd="kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}'"
  wait_install "20 minute" "$cmd"
@@ -325,16 +396,16 @@ configure_loadbalancer_for_tvkUI()
     echo "Loadbalancer taking time to get External IP"
     exit 1
  fi
- external_ip=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer.ingress[0].ip}')
- kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.${domain}"'"}]}}' >/dev/null 2>/dev/null
- doctl compute domain records create "${domain}" --record-type A --record-name "${tvkhost_name}" --record-data "${external_ip}" >/dev/null 2>/dev/null
+ external_ip=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer.ingress[0].ip}' 2>> >(logit))
+ kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.${domain}"'"}]}}' 1>> >(logit) 2>> >(logit)
+ doctl compute domain records create "${domain}" --record-type A --record-name "${tvkhost_name}" --record-data "${external_ip}" 1>> >(logit) 2>> >(logit)
  retCode=$?
- if [[ retCode -ne 0 ]]; then
+ if [[ "$retCode" -ne 0 ]]; then
    echo "Failed to create record, please check domain name"
    exit 1
  fi
 
- doctl kubernetes cluster kubeconfig show "${cluster_name}" > config_"${cluster_name}" 
+ doctl kubernetes cluster kubeconfig show "${cluster_name}" > config_"${cluster_name}" 2>> >(logit)
  link="http://${tvkhost_name}.${domain}/login"
  echo "You can access TVK UI: $link"
  echo "provide config file stored at location: $PWD/config_${cluster_name}"
@@ -363,7 +434,7 @@ create_target()
    fi
    case $target_type in
      2)
-	yes | sudo apt-get install s3cmd >/dev/null 2>/dev/null
+	yes | sudo apt-get install s3cmd 1>> >(logit) 2>> >(logit)
 	#Create s3cfg_confg file for target creation
 	cat > s3cfg_config <<- EOM
 [default]
@@ -460,7 +531,7 @@ EOM
 	if [[ -z "$if_resource_exists_still_proceed" ]];then
           if_resource_exists_still_proceed=True
         fi
-	if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>/dev/null) ]];
+	if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>> >(logit)) ]];
         then
 	  echo "Target with same name already exists"
 	  if ! [[ $if_resource_exists_still_proceed ]]
@@ -489,7 +560,7 @@ EOM
           sudo cp s3cfg_config "$HOME"/.s3cfg
         done
         #create bucket
-	ret_val=$(s3cmd mb s3://"$bucket_name"  2>&1)
+	ret_val=$(s3cmd mb s3://"$bucket_name" 2>> >(logit))
         ret_code=$(echo "$ret_val" | grep 'Bucket already exists')
 	if [[ "$ret_code" ]]; then 
           echo "WARNING: Bucket already exists"
@@ -498,7 +569,7 @@ EOM
         fi
         #create S3 target
         url="https://$host_base"
-	cat <<EOF | kubectl apply -f - &>/dev/null
+	cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: Target
 metadata:
@@ -515,6 +586,11 @@ spec:
     region: "$region"
   thresholdCapacity: $thresholdCapacity
 EOF
+        retcode=$?
+        if [ "$retcode" -ne 0 ];then
+          echo "Target creation failed"
+          exit 1
+        fi
 	;;
      1)
 	if  [[ -z ${input_config} ]];then
@@ -545,8 +621,9 @@ EOF
         if [[ -z "$nfs_options" ]]; then
           nfs_options='nfsvers=4'
         fi
+	set -x
 	echo "Creating target..."
-	cat <<EOF | kubectl apply -f - &>/dev/null 
+	cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: Target
 metadata:
@@ -560,6 +637,11 @@ spec:
     nfsOptions: ${nfs_options}
   thresholdCapacity: ${thresholdCapacity}
 EOF
+        retcode=$?
+	if [ "$retcode" -ne 0 ];then
+	  echo "Target creation failed"
+	  exit 1
+	fi
 	;;
     *)
 	echo "Wrong selection"
@@ -608,8 +690,8 @@ sample_test()
      kubectl create ns $backup_namespace 2>/dev/null
    fi
    #Add stable helm repo
-   helm repo add stable https://charts.helm.sh/stable >/dev/null 2>/dev/null
-   helm repo update >/dev/null 2>/dev/null
+   helm repo add stable https://charts.helm.sh/stable 1>> >(logit) 2>> >(logit)
+   helm repo update 1>> >(logit) 2>> >(logit)
    echo "User can take backup in multiple ways"
    if  [[ -z ${input_config} ]];then
      echo -e "Select an the backup way\n1.Label based(MySQL)\n2.Namespace based(Wordpress)\n3.Operator based(Postgres Operator)\n4.Helm based(Mongodb)"
@@ -664,7 +746,7 @@ EOM
             exit 1
 	  fi
         else
-          helm install mysql-qa stable/mysql -n $backup_namespace
+          helm install mysql-qa stable/mysql -n $backup_namespace 1>> >(logit) 2>> >(logit)
           echo "Installing Application"
           cmd="kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running"
           wait_install "10 minute" "$cmd"
@@ -673,12 +755,12 @@ EOM
             exit 1
           fi
 	  echo "Requested application is installed successfully"
-          yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
-          yq eval -i '.spec.backupPlanComponents.custom[0].matchLabels.app="mysql-qa"' backupplan.yaml 2>/dev/null
+          yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 1>> >(logit) 2>> >(logit)
+          yq eval -i '.spec.backupPlanComponents.custom[0].matchLabels.app="mysql-qa"' backupplan.yaml 1>> >(logit) 2>> >(logit)
         fi
 	;;
       2)
-	if helm list -n $backup_namespace | grep -w -q my-wordpress;
+	if helm list -n $backup_namespace | grep -w -q my-wordpress 2>> >(logit);
 	then
 	  echo "Application exists"
 	  if ! [[ $if_resource_exists_still_proceed ]]
@@ -687,8 +769,8 @@ EOM
           fi
 	else
 	  #Add bitnami helm repo
-	  helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>/dev/null
-          helm install my-wordpress bitnami/wordpress -n $backup_namespace >/dev/null 2>/dev/null
+	  helm repo add bitnami https://charts.bitnami.com/bitnami 1>> >(logit) 2>> >(logit)
+          helm install my-wordpress bitnami/wordpress -n $backup_namespace 1>> >(logit) 2>> >(logit)
 	  echo "Installing Application"
 	  runtime="10 minute"
           spin='-\|/'
@@ -705,15 +787,15 @@ EOM
 	    exit 1
 	  fi
 	  echo "Requested application is installed successfully"
-	  yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
+	  yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 1>> >(logit) 2>> >(logit)
 	fi
 	;;
 
       3)
         echo "MySQL operator will require enough resources, else the deployment will fail"
-        helm repo add presslabs https://presslabs.github.io/charts >/dev/null 2>/dev/null
-        errormessage=$(helm install mysql-operator presslabs/mysql-operator -n $backup_namespace 2>&1)
-        if echo $errormessage  | grep -Eq 'Error:|error:'; then
+        helm repo add presslabs https://presslabs.github.io/charts 1>> >(logit) 2>> >(logit)
+        errormessage=$(helm install mysql-operator presslabs/mysql-operator -n $backup_namespace 2>> >(logit))
+        if echo "$errormessage"  | grep -Eq 'Error:|error:'; then
           echo "Mysql operator Installation failed with error: $errormessage"
           exit 1
         fi
@@ -733,8 +815,8 @@ EOM
           exit 1
         fi
         #Create a MySQL cluster
-        kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster-secret.yaml -n $backup_namespace
-        kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster.yaml -n $backup_namespace
+        kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster-secret.yaml -n $backup_namespace 2>> >(logit)
+        kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster.yaml -n $backup_namespace 2>> >(logit)
         runtime="15 minute"
         spin='-\|/'
         i=0
@@ -752,15 +834,17 @@ EOM
           exit 1
         fi
 	#Creating backupplan
- 	yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].operatorId="my-cluster"' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.group="mysql.presslabs.org" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.group style="double"' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.version="v1alpha1" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.version style="double"' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.kind="MysqlCluster" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.kind style="double"' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].objects[0]="my-cluster"' backupplan.yaml 2>/dev/null
-        yq eval -i '.spec.backupPlanComponents.operators[0].operatorResourceSelector[0].matchLabels.name="mysql-operator"' backupplan.yaml 2>/dev/null
-	yq eval -i '.spec.backupPlanComponents.operators[0].applicationResourceSelector[0].matchLabels.app="mysql-operator"' backupplan.yaml 2>/dev/null
-        ;;
+	{
+ 	  yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml
+          yq eval -i '.spec.backupPlanComponents.operators[0].operatorId="my-cluster"' backupplan.yaml
+          yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.group="mysql.presslabs.org" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.group style="double"' backupplan.yaml
+          yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.version="v1alpha1" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.version style="double"' backupplan.yaml
+          yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.kind="MysqlCluster" | .spec.backupPlanComponents.operators[0].customResources[0].groupVersionKind.kind style="double"' backupplan.yaml
+          yq eval -i '.spec.backupPlanComponents.operators[0].customResources[0].objects[0]="my-cluster"' backupplan.yaml
+          yq eval -i '.spec.backupPlanComponents.operators[0].operatorResourceSelector[0].matchLabels.name="mysql-operator"' backupplan.yaml
+	  yq eval -i '.spec.backupPlanComponents.operators[0].applicationResourceSelector[0].matchLabels.app="mysql-operator"' backupplan.yaml
+        } 1>> >(logit) 2>> >(logit)
+	;;
       4)
 	if helm list -n $backup_namespace | grep -q -w mongotest
         then
@@ -770,9 +854,11 @@ EOM
             exit 1
           fi
         else
-	  helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>/dev/null
-          helm repo update >/dev/null 2>/dev/null
-          helm install mongotest bitnami/mongodb -n $backup_namespace
+          {
+	    helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo update 1>> >(logit)
+            helm install mongotest bitnami/mongodb -n
+	  } 2>> >(logit)
 	  echo "Installing App..."
 	  runtime="15 minute"
           spin='-\|/'
@@ -789,8 +875,8 @@ EOM
             exit 1
           fi
 	  echo "Requested application is installed successfully"
-          yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 2>/dev/null
-	  yq eval -i '.spec.backupPlanComponents.helmReleases[0]="mongotest"' backupplan.yaml 2>/dev/null
+          yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 1>> >(logit) 2>> >(logit)
+	  yq eval -i '.spec.backupPlanComponents.helmReleases[0]="mongotest"' backupplan.yaml 1>> >(logit) 2>> >(logit)
 	fi
 	;;
       *)
@@ -807,13 +893,15 @@ EOM
         fi
    else
      #Applying backupplan manifest
-     yq eval -i '.metadata.name="'$bk_plan_name'"' backupplan.yaml 2>/dev/null
-     yq eval -i '.metadata.namespace="'$backup_namespace'"' backupplan.yaml 2>/dev/null
-     yq eval -i '.spec.backupNamespace="'$backup_namespace'"' backupplan.yaml 2>/dev/null
-     yq eval -i '.spec.backupConfig.target.name="'"$target_name"'"' backupplan.yaml 2>/dev/null
-     yq eval -i '.spec.backupConfig.target.namespace="'"$target_namespace"'"' backupplan.yaml 2>/dev/null
+     {
+       yq eval -i '.metadata.name="'$bk_plan_name'"' backupplan.yaml
+       yq eval -i '.metadata.namespace="'$backup_namespace'"' backupplan.yaml
+       yq eval -i '.spec.backupNamespace="'$backup_namespace'"' backupplan.yaml
+       yq eval -i '.spec.backupConfig.target.name="'"$target_name"'"' backupplan.yaml
+       yq eval -i '.spec.backupConfig.target.namespace="'"$target_namespace"'"' backupplan.yaml
+     } 1>> >(logit) 2>> >(logit)
      echo "Creating backupplan..."
-     cat <<EOF | kubectl apply -f - &>/dev/null
+     cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: Policy
 metadata:
@@ -826,6 +914,11 @@ spec:
     weekly: 7
     monthly: 30
 EOF
+     retcode=$?
+     if [ "$retcode" -ne 0 ];then
+       echo "Erro while applying policy"
+       exit
+     fi
      if ! kubectl apply -f backupplan.yaml -n $backup_namespace;then
           echo "Backupplan creation failed"
           exit 1
@@ -841,7 +934,7 @@ EOF
 
    fi
    rm -f backupplan.yaml
-   if [[ $(kubectl get backup $backup_name  -n  $backup_namespace 2>/dev/null) ]];
+   if [[ $(kubectl get backup $backup_name  -n  $backup_namespace 2>> >(logit)) ]];
       then
         echo "Backup with same name already exists"
         if ! [[ $if_resource_exists_still_proceed ]]
@@ -851,7 +944,7 @@ EOF
    else
      echo "Creating Backup..."
      #Applying backup manifest
-     cat <<EOF | kubectl apply -f - &>/dev/null
+     cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: Backup
 metadata:
@@ -864,6 +957,11 @@ spec:
     name: ${bk_plan_name}
     namespace: ${backup_namespace}
 EOF
+     retcode=$?
+     if [ "$retcode" -ne 0 ];then
+       echo "Error while creating backup"
+       exit 1
+     fi
      cmd="kubectl get backup $backup_name -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Failed"
      wait_install "60 minute" "$cmd"
      if ! kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -w Available; then
@@ -885,7 +983,11 @@ EOF
      if [[ -z "$restore_namespace" ]]; then
 	restore_namespace="trilio-test-rest"
      fi
-     kubectl create ns $restore_namespace 2>/dev/null
+     if ! kubectl create ns "$restore_namespace" 1>> >(logit) 2>> >(logit) 
+     then 
+       echo "Error while creating $restore_namespace namespace"
+       exit 1
+     fi  
      if [[ -z "$restore_name" ]]; then
 	restore_name="trilio-test-restore"
      fi
@@ -899,7 +1001,7 @@ EOF
      else
      echo "Creating restore..."
      #Applying restore manifest
-     cat <<EOF | kubectl apply -f - &>/dev/null
+     cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: Restore
 metadata:
@@ -919,6 +1021,11 @@ spec:
   restoreNamespace: ${restore_namespace}
   skipIfAlreadyExists: true
 EOF
+       retcode=$?
+       if [ "$retcode" -ne 0 ];then
+         echo "Error while restoring"
+	 exit 1
+       fi
        cmd="kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Completed -e Failed"
        wait_install "60 minute" "$cmd"
        if ! kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -w 'Completed'; then
@@ -954,8 +1061,6 @@ Options:
 
 main()
 {
-  log_file="logs.txt"
-  exec &> >(tee -a "$log_file")
   for i in "$@"; do
     #key="$1"
     case $i in
@@ -1033,4 +1138,15 @@ main()
   fi
     
 }
+
+logit() {
+     # shellcheck disable=SC2162
+    while read
+    do
+        printf "%(%Y-%m-%d %T)T %s\n" -1 "$REPLY"  >> "${LOG_FILE}"
+    done
+}
+
+LOG_FILE="/tmp/tvk_oneclick_stderr"
+
 main "$@"
