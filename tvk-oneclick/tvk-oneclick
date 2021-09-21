@@ -90,13 +90,15 @@ wait_install()
   runtime=$1
   spin='-\|/'
   i=0
-  endtime=$(date -ud "$runtime" +%s)
+  #endtime=$(date -ud "$runtime" +%s)
+  secs=$(perl -e 'print time(), "\n"')
+  ((endtime=secs+$runtime*60))
   if [[ -z ${endtime} ]];then
     echo "There is some issue with date usage, please check the pre-requsites in README page" 1>> >(logit) 2>> >(logit)
     echo "Something went wrong..terminating" 2>> >(logit)
   fi
   val1=$(eval "$2")
-  while [[ $(date -u +%s) -le $endtime ]] && [[ "" == "$val1" ]] || [[ "$val1" == '{}' ]]
+  while [[ $(perl -e 'print time(), "\n"') -le $endtime ]] && [[ "" == "$val1" ]] || [[ "$val1" == '{}' ]]
   do
     i=$(( (i+1) %4 ))
     printf "\r %s" "${spin:$i:1}"
@@ -180,7 +182,7 @@ install_tvk()
     fi
   fi
   cmd="kubectl get pod -l release=triliovault-operator -o 'jsonpath={.items[*].status.conditions[*].status}' | grep -v False"
-  wait_install "10 minute" "$cmd"
+  wait_install 10 "$cmd"
   if ! kubectl get pods -l release=triliovault-operator 2>/dev/null | grep -q Running;then
     echo "Triliovault operator installation failed"
     exit 1
@@ -263,9 +265,9 @@ EOF
   sleep 2
   echo "Installing Triliovault manager...."
   cmd="kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep Running"
-  wait_install "10 minute" "$cmd"
+  wait_install 10 "$cmd"
   cmd="kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null | grep Running"
-  wait_install "10 minute" "$cmd"
+  wait_install 10 "$cmd"
   if ! kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep -q Running && ! kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null | grep -q Running; then
       echo "TVM installation failed"
       exit 1
@@ -389,7 +391,7 @@ configure_loadbalancer_for_tvkUI()
  fi
  echo "Configuring UI......This may take some time"
  cmd="kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}'"
- wait_install "20 minute" "$cmd"
+ wait_install 20 "$cmd"
  val_status=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}')
  if [[ $val_status == '{}' ]]
  then
@@ -650,7 +652,7 @@ EOF
     esac
     shift
    cmd="kubectl get target $target_name -n  $target_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Unavailable"
-   wait_install "20 minute" "$cmd"
+   wait_install 20 "$cmd"
    if ! kubectl get target "$target_name"  -n  "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Available; then
      echo "Failed to create target"
      exit 1
@@ -749,7 +751,7 @@ EOM
           helm install mysql-qa stable/mysql -n $backup_namespace 1>> >(logit) 2>> >(logit)
           echo "Installing Application"
           cmd="kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running"
-          wait_install "10 minute" "$cmd"
+          wait_install 10 "$cmd"
           if ! kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep -q Running; then
             echo "Application installation failed"
             exit 1
@@ -857,7 +859,7 @@ EOM
           {
 	    helm repo add bitnami https://charts.bitnami.com/bitnami
             helm repo update 1>> >(logit)
-            helm install mongotest bitnami/mongodb -n
+            helm install mongotest bitnami/mongodb -n $backup_namespace
 	  } 2>> >(logit)
 	  echo "Installing App..."
 	  runtime="15 minute"
@@ -924,7 +926,7 @@ EOF
           exit 1
      fi
      cmd="kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Unavailable"
-     wait_install "10 minute" "$cmd"
+     wait_install 10 "$cmd"
      if ! kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Available; then
        echo "Backupplan creation failed"
        exit 1
@@ -963,7 +965,7 @@ EOF
        exit 1
      fi
      cmd="kubectl get backup $backup_name -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Failed"
-     wait_install "60 minute" "$cmd"
+     wait_install 60 "$cmd"
      if ! kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -w Available; then
        echo "Backup Failed"
        exit 1
@@ -1027,7 +1029,7 @@ EOF
 	 exit 1
        fi
        cmd="kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Completed -e Failed"
-       wait_install "60 minute" "$cmd"
+       wait_install 60 "$cmd"
        if ! kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -w 'Completed'; then
          echo "Restore Failed"
          exit 1
