@@ -124,10 +124,10 @@ install_tvk()
   if  [[ -z ${input_config} ]];then
     read -r -p "Please provide the operator version to be installed(2.1.0): " operator_version
     read -r -p "Please provide the triliovault manager version(v2.1.1-alpha): " triliovault_manager_version
-    read -r -p "Proceed even if resource exists(True): " if_resource_exists_still_proceed
+    read -r -p "Proceed even if resource exists y/n(y): " if_resource_exists_still_proceed
   fi
   if [[ -z "$if_resource_exists_still_proceed" ]];then
-    if_resource_exists_still_proceed=True
+    if_resource_exists_still_proceed='y'
   fi
   if [[ -z "$operator_version" ]];then
     operator_version='2.1.0'
@@ -146,6 +146,10 @@ install_tvk()
       exit 1
     fi
   else
+    echo "Triliovault operator is already installed!"
+    if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
+        exit 1
+    fi
     old_operator_version=$(helm list  -n "$get_ns" | grep k8s-triliovault-operator | awk '{print $9}' | rev  | cut -d- -f1 | rev | sed 's/[a-z-]//g')
     # shellcheck disable=SC2001
     new_operator_version=$(echo $operator_version | sed 's/[a-z-]//g')
@@ -153,10 +157,11 @@ install_tvk()
     ret_val=$?
     if [[ $ret_val != 2 ]];then
       echo "Triliovault operator cannot be upgraded, please check version number"
-      if ! [[ $if_resource_exists_still_proceed ]];then
+      if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
         exit 1
       fi
     else
+      upgrade_tvo=1
       echo "Upgrading Triliovault operator"
       semver=( ${old_operator_version//./ } )
       major="${semver[0]}"
@@ -184,13 +189,21 @@ install_tvk()
   cmd="kubectl get pod -l release=triliovault-operator -o 'jsonpath={.items[*].status.conditions[*].status}' | grep -v False"
   wait_install 10 "$cmd"
   if ! kubectl get pods -l release=triliovault-operator 2>/dev/null | grep -q Running;then
-    echo "Triliovault operator installation failed"
+    if [[ $upgrade_tvo == 1 ]];then
+      echo "Triliovault operator upgrade failed"
+    else
+      echo "Triliovault operator installation failed"
+    fi
     exit 1
   fi
   echo "Triliovault operator is running"
   
   #check if TVK manager is installed
   if [[ $(kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null) ]] && [[ $(kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null) ]];then
+    echo "Triliovault manager is already installed"
+    if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
+      exit 1
+    fi
     #Check if TVM can be upgraded
     old_tvm_version=$(kubectl get TrilioVaultManager -n "$get_ns" -o json | grep releaseVersion | awk '{print$2}' | sed 's/[a-z-]//g' |  sed -e 's/^"//' -e 's/"$//')
     # shellcheck disable=SC2001
@@ -199,11 +212,13 @@ install_tvk()
     ret_val=$?
     if [[ $ret_val != 2 ]];then
       echo "TVM cannot be upgraded! Please check version"
-      if ! [[ $if_resource_exists_still_proceed ]];then
+      if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
         exit 1
       fi
       return
     else
+      echo "Upgrading triliovault manager.."
+      tvm_upgrade=1
       if [[ $old_tvm_version == 2.1* ]] && [[ $new_triliovault_manager_version == 2.5* ]];
       then
         svc_type=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.spec.type}')
@@ -259,20 +274,32 @@ spec:
 EOF
   retcode=$?
   if [ "$retcode" -ne 0 ];then 
-    echo "There is error in installing triliovault manager,please resolve and try again" 2>> >(logit)
+    echo "There is error in installingi/upgrading triliovault manager,please resolve and try again" 2>> >(logit)
     exit 1
   fi
   sleep 2
-  echo "Installing Triliovault manager...."
+  if [[ $tvm_upgrade == 1 ]];then
+    echo "Upgrading Triliovault manager..."
+  else
+    echo "Installing Triliovault manager...."
+  fi
   cmd="kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep Running"
   wait_install 10 "$cmd"
   cmd="kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null | grep Running"
   wait_install 10 "$cmd"
   if ! kubectl get pods -l app=k8s-triliovault-control-plane 2>/dev/null | grep -q Running && ! kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null | grep -q Running; then
-      echo "TVM installation failed"
+      if [[ $tvm_upgrade == 1 ]];then
+        echo "TVM upgrade failed"
+      else
+        echo "TVM installation failed"
+      fi
       exit 1
   fi
-  echo "TVK Manager is installed"
+  if [[ $tvm_upgrade == 1 ]];then
+    echo "TVM is upgraded successfully!"
+  else
+    echo "TVK Manager is installed"
+  fi
   install_license
 }
 
@@ -308,6 +335,12 @@ print(soup.body.find('div', attrs={'class':'yaml-content'}).text)
 sys.stdout.close()
 result = subprocess.check_output("kubectl apply -f license_file1.yaml", shell=True)
 EOF
+  if ! kubectl get license 1>> >(logit) 2>> >(logit);then
+    echo "License installation failed"
+    exit 1
+  else
+    echo "License is installed successfully"
+  fi 
 }
 
 
@@ -358,7 +391,10 @@ configure_ui()
 configure_nodeport_for_tvkui()
 {
   if  [[ -z ${input_config} ]];then
-    read -r -p "Please enter hostname for a cluster: " tvkhost_name
+    read -r -p "Please enter host name for tvk ingress(tvk-doks): " tvkhost_name
+  fi
+  if [[ -z ${tvkhost_name} ]];then
+    tvkhost_name="tvk-doks"
   fi
   gateway=$(kubectl get pods --no-headers=true 2>/dev/null | awk '/k8s-triliovault-ingress-gateway/{print $1}')
   if [[ -z "$gateway" ]]; then
@@ -368,50 +404,58 @@ configure_nodeport_for_tvkui()
   node=$(kubectl get pods "$gateway" -o jsonpath='{.spec.nodeName}' 2>> >(logit))
   ip=$(kubectl get node "$node"  -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}' 2>> >(logit))
   port=$(kubectl get svc k8s-triliovault-ingress-gateway  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>> >(logit))
-  if ! kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}-tvk.com"'"}]}}';then
+  if ! kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.com"'"}]}}';then
     echo "TVK UI configuration failed, please check ingress"
     exit 1
   fi
-  echo "For accesing UI, create an entry in /etc/hosts file for the IPs like '$ip  $tvkhost_name-tvk.com'"
-  echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name-tvk.com:$port"
+  echo "For accesing UI, create an entry in /etc/hosts file for the IPs like '$ip  $tvkhost_name.com'"
+  echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name.com:$port"
   echo "For https access, please refer - https://docs.trilio.io/kubernetes/management-console/user-interface/accessing-the-ui" 
 }
 
 #This function is used to configure TVK UI through Loadbalancer
 configure_loadbalancer_for_tvkUI()
 {
- if  [[ -z ${input_config} ]];then
-   read -r -p "Please enter domainname for cluster: " domain
-   read -r -p "Please enter host name  for a cluster: " tvkhost_name
-   read -r -p "Please enter cluster name: " cluster_name 
- fi
- if ! kubectl patch svc k8s-triliovault-ingress-gateway -p '{"spec": {"type": "LoadBalancer"}}' 1>> >(logit) 2>> >(logit) ; then
-   echo "TVK UI configuration failed, please check ingress"
-   exit 1
- fi
- echo "Configuring UI......This may take some time"
- cmd="kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}'"
- wait_install 20 "$cmd"
- val_status=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}')
- if [[ $val_status == '{}' ]]
- then
+  if  [[ -z ${input_config} ]];then
+    read -r -p "Please enter domainname for cluster: " domain
+    read -r -p "Please enter host name for tvk ingress(tvk-doks): " tvkhost_name
+  fi
+  if [[ -z ${tvkhost_name} ]];then
+    tvkhost_name="tvk-doks"
+  fi
+  cluster_name=$(kubectl config view --minify -o jsonpath='{.clusters[].name}' | cut -d'-' -f3-)
+  if [[ -z ${cluster_name} ]];then
+    echo "Error in getting cluster name from the current-context set in kubeconfig"
+    echo "Please check the current-context"
+    return
+  fi
+  if ! kubectl patch svc k8s-triliovault-ingress-gateway -p '{"spec": {"type": "LoadBalancer"}}' 1>> >(logit) 2>> >(logit) ; then
+    echo "TVK UI configuration failed, please check ingress"
+    exit 1
+  fi
+  echo "Configuring UI......This may take some time"
+  cmd="kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}'"
+  wait_install 20 "$cmd"
+  val_status=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}')
+  if [[ $val_status == '{}' ]]
+  then
     echo "Loadbalancer taking time to get External IP"
     exit 1
- fi
- external_ip=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer.ingress[0].ip}' 2>> >(logit))
- kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.${domain}"'"}]}}' 1>> >(logit) 2>> >(logit)
- doctl compute domain records create "${domain}" --record-type A --record-name "${tvkhost_name}" --record-data "${external_ip}" 1>> >(logit) 2>> >(logit)
- retCode=$?
- if [[ "$retCode" -ne 0 ]]; then
+  fi
+  external_ip=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer.ingress[0].ip}' 2>> >(logit))
+  kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.${domain}"'"}]}}' 1>> >(logit) 2>> >(logit)
+  doctl compute domain records create "${domain}" --record-type A --record-name "${tvkhost_name}" --record-data "${external_ip}" 1>> >(logit) 2>> >(logit)
+  retCode=$?
+  if [[ "$retCode" -ne 0 ]]; then
    echo "Failed to create record, please check domain name"
    exit 1
- fi
+  fi
 
- doctl kubernetes cluster kubeconfig show "${cluster_name}" > config_"${cluster_name}" 2>> >(logit)
- link="http://${tvkhost_name}.${domain}/login"
- echo "You can access TVK UI: $link"
- echo "provide config file stored at location: $PWD/config_${cluster_name}"
- echo "Info:UI may take 30 min to come up"
+  doctl kubernetes cluster kubeconfig show "${cluster_name}" > config_"${cluster_name}" 2>> >(logit)
+  link="http://${tvkhost_name}.${domain}/login"
+  echo "You can access TVK UI: $link"
+  echo "provide config file stored at location: $PWD/config_${cluster_name}"
+  echo "Info:UI may take 30 min to come up"
 }
 
 
@@ -528,17 +572,16 @@ EOM
           read -r -p "Target Name: " target_name
           read -r -p "Target Namespace: " target_namespace
 	  read -r -p "thresholdCapacity(1000Gi): " thresholdCapacity
-	  read -r -p "Proceed even if resource exists(True): " if_resource_exists_still_proceed
+	  read -r -p "Proceed even if resource exists y/n(y): " if_resource_exists_still_proceed
         fi
 	if [[ -z "$if_resource_exists_still_proceed" ]];then
-          if_resource_exists_still_proceed=True
+          if_resource_exists_still_proceed='y'
         fi
 	if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>> >(logit)) ]];
         then
 	  echo "Target with same name already exists"
-	  if ! [[ $if_resource_exists_still_proceed ]]
-	  then
-	    exit 1
+	  if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
+            exit 1
 	  else
 	    return 0
           fi
@@ -602,18 +645,17 @@ EOF
           read -r -p "Export Path: " nfs_path
           read -r -p "NFSoption(nfsvers=4): " nfs_options
           read -r -p "thresholdCapacity(1000Gi): " thresholdCapacity
-	  read -r -p "Proceed even if resource exists(True): " if_resource_exists_still_proceed
+	  read -r -p "Proceed even if resource exists y/n(y): " if_resource_exists_still_proceed
 	fi
         if [[ -z "$if_resource_exists_still_proceed" ]];then
-          if_resource_exists_still_proceed=True
+          if_resource_exists_still_proceed='y'
         fi
 	if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>/dev/null) ]];
         then
           echo "Target with same name already exists"
-          if ! [[ $if_resource_exists_still_proceed ]]
-          then
+	  if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
             exit 1
-          else
+	  else
             return 0
           fi
         fi
@@ -673,10 +715,10 @@ sample_test()
      read -r -p "Backupplan name(trilio-test-backup): " bk_plan_name
      read -r -p "Backup Name(trilio-test-backup): " backup_name
      read -r -p "Backup Namespace Name(trilio-test-backup): " backup_namespace
-     read -r -p "Proceed even if resource exists(True): " if_resource_exists_still_proceed
+     read -r -p "Proceed even if resource exists y/n(y): " if_resource_exists_still_proceed
    fi
    if [[ -z "$if_resource_exists_still_proceed" ]];then
-      if_resource_exists_still_proceed=True
+      if_resource_exists_still_proceed='y'
    fi
    if [[ -z "$backup_namespace" ]]; then
       backup_namespace=trilio-test-backup
@@ -694,7 +736,6 @@ sample_test()
    #Add stable helm repo
    helm repo add stable https://charts.helm.sh/stable 1>> >(logit) 2>> >(logit)
    helm repo update 1>> >(logit) 2>> >(logit)
-   echo "User can take backup in multiple ways"
    if  [[ -z ${input_config} ]];then
      echo -e "Select an the backup way\n1.Label based(MySQL)\n2.Namespace based(Wordpress)\n3.Operator based(Postgres Operator)\n4.Helm based(Mongodb)"
      read -r -p "Select option: " backup_way
@@ -743,10 +784,9 @@ EOM
         if helm list -n "$backup_namespace" | grep -w -q mysql-qa;
         then
           echo "Application exists"
-          if ! [[ $if_resource_exists_still_proceed ]]
-          then
+	  if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
             exit 1
-	  fi
+          fi
         else
           helm install mysql-qa stable/mysql -n $backup_namespace 1>> >(logit) 2>> >(logit)
           echo "Installing Application"
@@ -765,8 +805,7 @@ EOM
 	if helm list -n $backup_namespace | grep -w -q my-wordpress 2>> >(logit);
 	then
 	  echo "Application exists"
-	  if ! [[ $if_resource_exists_still_proceed ]]
-          then
+	  if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
             exit 1
           fi
 	else
@@ -851,8 +890,7 @@ EOM
 	if helm list -n $backup_namespace | grep -q -w mongotest
         then
           echo "Application exists"
-          if ! [[ $if_resource_exists_still_proceed ]]
-          then
+	  if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
             exit 1
           fi
         else
@@ -889,8 +927,7 @@ EOM
    if [[ $(kubectl get backupplan $bk_plan_name  -n  $backup_namespace 2>/dev/null) ]];
       then
         echo "Backupplan with same name already exists"
-        if ! [[ $if_resource_exists_still_proceed ]]
-        then
+        if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
           exit 1
         fi
    else
@@ -939,8 +976,7 @@ EOF
    if [[ $(kubectl get backup $backup_name  -n  $backup_namespace 2>> >(logit)) ]];
       then
         echo "Backup with same name already exists"
-        if ! [[ $if_resource_exists_still_proceed ]]
-        then
+        if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
           exit 1
         fi
    else
@@ -996,8 +1032,7 @@ EOF
      if [[ $(kubectl get restore $restore_name  -n  $restore_namespace 2>/dev/null) ]];
       then
         echo "Restore with same name already exists"
-        if ! [[ $if_resource_exists_still_proceed ]]
-        then
+        if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
           exit 1
         fi
      else
@@ -1145,7 +1180,9 @@ logit() {
      # shellcheck disable=SC2162
     while read
     do
-        printf "%(%Y-%m-%d %T)T %s\n" -1 "$REPLY"  >> "${LOG_FILE}"
+      time=$(perl -MPOSIX -le 'print strftime "%F %T", localtime $^T') 
+      echo "$time $REPLY" >> "${LOG_FILE}"
+      #printf "%(%Y-%m-%d %T)T %s\n" -1 "$REPLY"  >> "${LOG_FILE}"
     done
 }
 
