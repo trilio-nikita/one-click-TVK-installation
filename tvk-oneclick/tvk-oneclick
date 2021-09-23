@@ -26,7 +26,7 @@ preflight_checks()
     fi
   fi 
   if  [[ -z "${input_config}" ]];then
-    read -r -p "Provide storageclass to be used for TVK/Application Installation(storageclass with default annotation): " storage_class
+    read -r -p "Provide storageclass to be used for TVK/Application Installation(storageclass with default annotation will be take as default): " storage_class
   fi
   if [[ -z "$storage_class" ]];then
 	  storage_class=$(kubectl get storageclass | grep -w '(default)' | awk  '{print $1}')
@@ -122,9 +122,9 @@ install_tvk()
   helm repo add triliovault http://charts.k8strilio.net/trilio-stable/k8s-triliovault 1>> >(logit) 2>> >(logit) 
   helm repo update 1>> >(logit) 2>> >(logit)
   if  [[ -z ${input_config} ]];then
-    read -r -p "Please provide the operator version to be installed(2.1.0): " operator_version
-    read -r -p "Please provide the triliovault manager version(v2.1.1-alpha): " triliovault_manager_version
-    read -r -p "Proceed even if resource exists y/n(y): " if_resource_exists_still_proceed
+    read -r -p "Please provide the operator version to be installed (default - 2.1.0): " operator_version
+    read -r -p "Please provide the triliovault manager version (default - v2.1.1-alpha): " triliovault_manager_version
+    read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
   fi
   if [[ -z "$if_resource_exists_still_proceed" ]];then
     if_resource_exists_still_proceed='y'
@@ -391,7 +391,7 @@ configure_ui()
 configure_nodeport_for_tvkui()
 {
   if  [[ -z ${input_config} ]];then
-    read -r -p "Please enter host name for tvk ingress(tvk-doks): " tvkhost_name
+    read -r -p "Please enter host name for tvk ingress (default - tvk-doks): " tvkhost_name
   fi
   if [[ -z ${tvkhost_name} ]];then
     tvkhost_name="tvk-doks"
@@ -417,8 +417,9 @@ configure_nodeport_for_tvkui()
 configure_loadbalancer_for_tvkUI()
 {
   if  [[ -z ${input_config} ]];then
-    read -r -p "Please enter domainname for cluster: " domain
-    read -r -p "Please enter host name for tvk ingress(tvk-doks): " tvkhost_name
+    echo "To use DigitalOcean DNS, you need to register a domain name with a registrar and update your domain’s NS records to point to DigitalOcean’s name servers."
+    read -r -p "Please enter domainname for cluster(Domain name you have registered and added in Doks console): " domain
+    read -r -p "Please enter host name for tvk ingress (default - tvk-doks): " tvkhost_name
   fi
   if [[ -z ${tvkhost_name} ]];then
     tvkhost_name="tvk-doks"
@@ -562,17 +563,18 @@ website_error =
 website_index = index.html
 EOM
 	if  [[ -z ${input_config} ]];then
+          echo "Please go through https://docs.digitalocean.com/products/spaces/resources/s3cmd/ to know about options"
           echo "for creation of bucket, please provide input"
           read -r -p "Access_key: " access_key
           read -r -p "Secret_key: " secret_key
-          read -r -p "Host Base(nyc3.digitaloceanspaces.com): " host_base
-	  read -r -p "Host Bucket(%(bucket)s.nyc3.digitaloceanspaces.com): " host_bucket
-	  read -r -p "gpg_passphrase(trilio): " gpg_passphrase
+          read -r -p "Host Base (default - nyc3.digitaloceanspaces.com): " host_base
+	  read -r -p "Host Bucket (default - %(bucket)s.nyc3.digitaloceanspaces.com): " host_bucket
+	  read -r -p "gpg_passphrase (default - trilio): " gpg_passphrase
           read -r -p "Bucket Name: " bucket_name
           read -r -p "Target Name: " target_name
           read -r -p "Target Namespace: " target_namespace
-	  read -r -p "thresholdCapacity(1000Gi): " thresholdCapacity
-	  read -r -p "Proceed even if resource exists y/n(y): " if_resource_exists_still_proceed
+	  read -r -p "thresholdCapacity (default - 1000Gi): " thresholdCapacity
+	  read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
         fi
 	if [[ -z "$if_resource_exists_still_proceed" ]];then
           if_resource_exists_still_proceed='y'
@@ -643,9 +645,9 @@ EOF
           read -r -p "NFSserver: " nfs_server
           read -r -p "namespace: " target_namespace
           read -r -p "Export Path: " nfs_path
-          read -r -p "NFSoption(nfsvers=4): " nfs_options
-          read -r -p "thresholdCapacity(1000Gi): " thresholdCapacity
-	  read -r -p "Proceed even if resource exists y/n(y): " if_resource_exists_still_proceed
+          read -r -p "NFSoption (default - nfsvers=4): " nfs_options
+          read -r -p "thresholdCapacity (default - 1000Gi): " thresholdCapacity
+	  read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
 	fi
         if [[ -z "$if_resource_exists_still_proceed" ]];then
           if_resource_exists_still_proceed='y'
@@ -712,10 +714,10 @@ sample_test()
      echo "Please provide input for test demo"
      read -r -p "Target Name: " target_name
      read -r -p "Target Namespace: "  target_namespace
-     read -r -p "Backupplan name(trilio-test-backup): " bk_plan_name
-     read -r -p "Backup Name(trilio-test-backup): " backup_name
-     read -r -p "Backup Namespace Name(trilio-test-backup): " backup_namespace
-     read -r -p "Proceed even if resource exists y/n(y): " if_resource_exists_still_proceed
+     read -r -p "Backupplan name (default - trilio-test-backup): " bk_plan_name
+     read -r -p "Backup Name (default - trilio-test-backup): " backup_name
+     read -r -p "Backup Namespace Name (default - trilio-test-backup): " backup_namespace
+     read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
    fi
    if [[ -z "$if_resource_exists_still_proceed" ]];then
       if_resource_exists_still_proceed='y'
@@ -1002,7 +1004,7 @@ EOF
      fi
      cmd="kubectl get backup $backup_name -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Failed"
      wait_install 60 "$cmd"
-     if ! kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -w Available; then
+     if ! kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -wq Available; then
        echo "Backup Failed"
        exit 1
      else
@@ -1015,8 +1017,8 @@ EOF
    if [[ ${restore} == "Y" ]] || [[ ${restore} == "y" ]] || [[ ${restore} == "True" ]]
    then
      if  [[ -z ${input_config} ]];then
-       read -r -p "Restore Namepsace(trilio-test-rest): " restore_namespace
-       read -r -p "Restore name(trilio-test-restore): " restore_name
+       read -r -p "Restore Namepsace (default - trilio-test-rest): " restore_namespace
+       read -r -p "Restore name (default - trilio-test-restore): " restore_name
      fi
      if [[ -z "$restore_namespace" ]]; then
 	restore_namespace="trilio-test-rest"
@@ -1065,7 +1067,7 @@ EOF
        fi
        cmd="kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Completed -e Failed"
        wait_install 60 "$cmd"
-       if ! kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -w 'Completed'; then
+       if ! kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -wq 'Completed'; then
          echo "Restore Failed"
          exit 1
        else
