@@ -11,7 +11,7 @@ preflight_checks()
   if [[ -z "$ret" ]];then
     echo "Please install krew plugin and then try.For information on krew installation please visit:"
     echo "https://krew.sigs.k8s.io/docs/user-guide/setup/install/"
-    exit 1
+    return 1
   fi
   if  [[ $(kubectl tvk-preflight --help  2>/dev/null) ]];
   then
@@ -32,7 +32,7 @@ preflight_checks()
 	  storage_class=$(kubectl get storageclass | grep -w '(default)' | awk  '{print $1}')
 	  if [[ -z "$storage_class" ]];then
 	    echo "No default storage class found, need one to proceed";
-	    exit 1
+	    return 1
           fi
   fi
   check=$(kubectl tvk-preflight --storageclass "$storage_class" | tee /dev/tty)
@@ -117,7 +117,7 @@ install_tvk()
   if [ "$retcode" -ne 0 ];then
     echo "There is some error in helm update,please resolve and try again" 1>> >(logit) 2>> >(logit)
     echo "Error ading helm repo"
-    exit 1
+    return 1
   fi
   helm repo add triliovault http://charts.k8strilio.net/trilio-stable/k8s-triliovault 1>> >(logit) 2>> >(logit) 
   helm repo update 1>> >(logit) 2>> >(logit)
@@ -143,7 +143,7 @@ install_tvk()
     retcode=$?
     if [ "$retcode" -ne 0 ];then 
       echo "There is some error in helm install triliovaul operator,please resolve and try again" 2>> >(logit) 
-      exit 1
+      return 1
     fi
   else
     echo "Triliovault operator is already installed!"
@@ -174,14 +174,14 @@ install_tvk()
 	retcode=$?
 	if [ "$retcode" -ne 0 ];then 
 	  echo "There is some error in helm tvm-upgrade,please resolve and try again" 2>> >(logit)
-	  exit 1
+	  return 1
         fi
       fi 	
       helm  upgrade triliovault-operator triliovault-operator/k8s-triliovault-operator --version $operator_version 2>> >(logit)
       retcode=$?
       if [ "$retcode" -ne 0 ];then 
         echo "There is some error in helm upgrade,please resolve and try again" 2>> >(logit)
-	exit 1
+	return 1
       fi
       sleep 10
     fi
@@ -194,7 +194,7 @@ install_tvk()
     else
       echo "Triliovault operator installation failed"
     fi
-    exit 1
+    return 1
   fi
   echo "Triliovault operator is running"
   
@@ -246,11 +246,10 @@ EOF
           retcode=$?
           if [ "$retcode" -ne 0 ];then
             echo "There is error upgrading triliovault manager,please resolve and try again" 2>> >(logit)
-            exit 1
 	  else
 	    echo "Triliovault manager upgraded successfully"
           fi
-          return
+          return 1
 	 fi
       fi
     fi
@@ -275,7 +274,7 @@ EOF
   retcode=$?
   if [ "$retcode" -ne 0 ];then 
     echo "There is error in installingi/upgrading triliovault manager,please resolve and try again" 2>> >(logit)
-    exit 1
+    return 1
   fi
   sleep 2
   if [[ $tvm_upgrade == 1 ]];then
@@ -293,7 +292,7 @@ EOF
       else
         echo "TVM installation failed"
       fi
-      exit 1
+      return 1
   fi
   if [[ $tvm_upgrade == 1 ]];then
     echo "TVM is upgraded successfully!"
@@ -359,7 +358,7 @@ configure_ui()
      ui_access_type=3
    else
      echo "Wrong option selected for ui_access_type"
-     exit 1
+     return 1 
    fi
  fi
  if [[ -z "$ui_access_type" ]]; then
@@ -380,7 +379,7 @@ configure_ui()
      ;;
    *)
      echo "Incorrect choice"
-     exit 1
+     return
      ;;
    esac
    shift
@@ -399,14 +398,14 @@ configure_nodeport_for_tvkui()
   gateway=$(kubectl get pods --no-headers=true 2>/dev/null | awk '/k8s-triliovault-ingress-gateway/{print $1}')
   if [[ -z "$gateway" ]]; then
     echo "Not able to find k8s-triliovault-ingress-gateway resource,TVK UI configuration failed"
-    exit 1
+    return 1
   fi
   node=$(kubectl get pods "$gateway" -o jsonpath='{.spec.nodeName}' 2>> >(logit))
   ip=$(kubectl get node "$node"  -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}' 2>> >(logit))
   port=$(kubectl get svc k8s-triliovault-ingress-gateway  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>> >(logit))
   if ! kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.com"'"}]}}';then
     echo "TVK UI configuration failed, please check ingress"
-    exit 1
+    return 1
   fi
   echo "For accesing UI, create an entry in /etc/hosts file for the IPs like '$ip  $tvkhost_name.com'"
   echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name.com:$port"
@@ -416,6 +415,12 @@ configure_nodeport_for_tvkui()
 #This function is used to configure TVK UI through Loadbalancer
 configure_loadbalancer_for_tvkUI()
 {
+  ret=$(doctl auth list 2>/dev/null)
+  if [[ -z $ret ]];then
+    echo "This functionality requires doctl installed"
+    echo "Please follow  to install https://docs.digitalocean.com/reference/doctl/how-to/install/ doctl"
+    return 1
+  fi
   if  [[ -z ${input_config} ]];then
     echo "To use DigitalOcean DNS, you need to register a domain name with a registrar and update your domain’s NS records to point to DigitalOcean’s name servers."
     read -r -p "Please enter domainname for cluster(Domain name you have registered and added in Doks console): " domain
@@ -428,11 +433,11 @@ configure_loadbalancer_for_tvkUI()
   if [[ -z ${cluster_name} ]];then
     echo "Error in getting cluster name from the current-context set in kubeconfig"
     echo "Please check the current-context"
-    return
+    return 1
   fi
   if ! kubectl patch svc k8s-triliovault-ingress-gateway -p '{"spec": {"type": "LoadBalancer"}}' 1>> >(logit) 2>> >(logit) ; then
     echo "TVK UI configuration failed, please check ingress"
-    exit 1
+    return 1
   fi
   echo "Configuring UI......This may take some time"
   cmd="kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer}'"
@@ -441,7 +446,7 @@ configure_loadbalancer_for_tvkUI()
   if [[ $val_status == '{}' ]]
   then
     echo "Loadbalancer taking time to get External IP"
-    exit 1
+    return 1
   fi
   external_ip=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.status.loadBalancer.ingress[0].ip}' 2>> >(logit))
   kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.${domain}"'"}]}}' 1>> >(logit) 2>> >(logit)
@@ -449,7 +454,7 @@ configure_loadbalancer_for_tvkUI()
   retCode=$?
   if [[ "$retCode" -ne 0 ]]; then
    echo "Failed to create record, please check domain name"
-   exit 1
+   return 1
   fi
 
   doctl kubernetes cluster kubeconfig show "${cluster_name}" > config_"${cluster_name}" 2>> >(logit)
@@ -477,11 +482,17 @@ create_target()
      fi
    fi
    if [[ -z "$target_type" ]]; then
-      target_type=2
+      target_type=1
    fi
    case $target_type in
      2)
-	yes | sudo apt-get install s3cmd 1>> >(logit) 2>> >(logit)
+	ret=$(s3cmd --version 2>/dev/null)
+	if [[ -z $ret ]];then
+	  echo "This functionality requires s3cmd utility installed"
+	  echo "Please check README or follow https://s3tools.org/s3cmd"
+	  return 1
+	fi
+	#yes | sudo apt-get install s3cmd 1>> >(logit) 2>> >(logit)
 	#Create s3cfg_confg file for target creation
 	cat > s3cfg_config <<- EOM
 [default]
@@ -636,7 +647,7 @@ EOF
         retcode=$?
         if [ "$retcode" -ne 0 ];then
           echo "Target creation failed"
-          exit 1
+          return 1
         fi
 	;;
      1)
@@ -686,12 +697,12 @@ EOF
         retcode=$?
 	if [ "$retcode" -ne 0 ];then
 	  echo "Target creation failed"
-	  exit 1
+	  return 1
 	fi
 	;;
     *)
 	echo "Wrong selection"
-	exit 1
+	return 1
 	;;
     esac
     shift
@@ -699,7 +710,7 @@ EOF
    wait_install 20 "$cmd"
    if ! kubectl get target "$target_name"  -n  "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Available; then
      echo "Failed to create target"
-     exit 1
+     return 1
    else
      echo "Target is Available to use"
    fi
@@ -739,7 +750,7 @@ sample_test()
    helm repo add stable https://charts.helm.sh/stable 1>> >(logit) 2>> >(logit)
    helm repo update 1>> >(logit) 2>> >(logit)
    if  [[ -z ${input_config} ]];then
-     echo -e "Select an the backup way\n1.Label based(MySQL)\n2.Namespace based(Wordpress)\n3.Operator based(Postgres Operator)\n4.Helm based(Mongodb)"
+     echo -e "Select an the backup way\n1.Label based(MySQL)\n2.Namespace based(Wordpress)\n3.Operator based(Mysql Operator)\n4.Helm based(Mongodb)"
      read -r -p "Select option: " backup_way
    else
      if [[ $backup_way == "Label_based" ]];then
@@ -752,12 +763,12 @@ sample_test()
        backup_way=4
      else
        echo "Backup way is wrong/not defined"
-       exit 1
+       return 1
      fi
    fi
    if [[ -z $backup_way ]];then
      echo "Please provide valid backup-way..exiting.."
-     exit 1
+     return 1
    fi
    #Create backupplan template
    cat > backupplan.yaml <<- EOM
@@ -800,7 +811,7 @@ EOM
           wait_install 10 "$cmd"
           if ! kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep -q Running; then
             echo "Application installation failed"
-            exit 1
+            return 1
           fi
 	  echo "Requested application is installed successfully"
           yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 1>> >(logit) 2>> >(logit)
@@ -831,7 +842,7 @@ EOM
           done 
 	  if kubectl get pod -l  app.kubernetes.io/instance=my-wordpress -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
             echo "Wordpress installation failed"
-	    exit 1
+	    return 1
 	  fi
 	  echo "Requested application is installed successfully"
 	  yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 1>> >(logit) 2>> >(logit)
@@ -844,7 +855,7 @@ EOM
         errormessage=$(helm install mysql-operator presslabs/mysql-operator -n $backup_namespace 2>> >(logit))
         if echo "$errormessage"  | grep -Eq 'Error:|error:'; then
           echo "Mysql operator Installation failed with error: $errormessage"
-          exit 1
+          return 1
         fi
         echo "Installing MySQL Operator..."
         runtime="10 minute"
@@ -859,7 +870,7 @@ EOM
         done
         if kubectl get pod -l app=mysql-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
           echo "MySQL operator installation failed"
-          exit 1
+          return 1
         fi
         #Create a MySQL cluster
         kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster-secret.yaml -n $backup_namespace 2>> >(logit)
@@ -878,7 +889,7 @@ EOM
         done
         if kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
           echo "MySQL cluster installation failed"
-          exit 1
+          return 1
         fi
 	#Creating backupplan
 	{
@@ -918,7 +929,7 @@ EOM
           done
 	  if kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].stat}" | grep -q False;then
             echo "Mongodb installation failed"
-            exit 1
+            return 1
           fi
 	  echo "Requested application is installed successfully"
           yq eval -i 'del(.spec.backupPlanComponents)' backupplan.yaml 1>> >(logit) 2>> >(logit)
@@ -962,17 +973,17 @@ EOF
      retcode=$?
      if [ "$retcode" -ne 0 ];then
        echo "Erro while applying policy"
-       exit
+       return 1
      fi
      if ! kubectl apply -f backupplan.yaml -n $backup_namespace;then
           echo "Backupplan creation failed"
-          exit 1
+          return 1
      fi
      cmd="kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Unavailable"
      wait_install 10 "$cmd"
      if ! kubectl get backupplan $bk_plan_name  -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Available; then
        echo "Backupplan creation failed"
-       exit 1
+       return 1
      else
        echo "Backupplan is in Available state"
      fi
@@ -1003,13 +1014,13 @@ EOF
      retcode=$?
      if [ "$retcode" -ne 0 ];then
        echo "Error while creating backup"
-       exit 1
+       return 1
      fi
      cmd="kubectl get backup $backup_name -n  $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Failed"
      wait_install 60 "$cmd"
      if ! kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -wq Available; then
        echo "Backup Failed"
-       exit 1
+       return 1
      else
        echo "Backup is Available Now"
      fi
@@ -1035,7 +1046,7 @@ EOF
        if ! kubectl create ns "$restore_namespace" 1>> >(logit) 2>> >(logit) 
        then 
          echo "Error while creating $restore_namespace namespace"
-         exit 1
+         return 1
        fi  
      fi
      if [[ -z "$restore_name" ]]; then
@@ -1071,13 +1082,13 @@ EOF
        retcode=$?
        if [ "$retcode" -ne 0 ];then
          echo "Error while restoring"
-	 exit 1
+	 return 1
        fi
        cmd="kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Completed -e Failed"
        wait_install 60 "$cmd"
        if ! kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -wq 'Completed'; then
          echo "Restore Failed"
-         exit 1
+         return 1
        else
          echo "Restore is Completed"
        fi
