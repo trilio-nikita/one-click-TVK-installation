@@ -403,12 +403,12 @@ configure_nodeport_for_tvkui()
   node=$(kubectl get pods "$gateway" -o jsonpath='{.spec.nodeName}' 2>> >(logit))
   ip=$(kubectl get node "$node"  -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}' 2>> >(logit))
   port=$(kubectl get svc k8s-triliovault-ingress-gateway  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>> >(logit))
-  if ! kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}.com"'"}]}}';then
+  if ! kubectl patch ingress k8s-triliovault-ingress-master -p '{"spec":{"rules":[{"host":"'"${tvkhost_name}"'"}]}}';then
     echo "TVK UI configuration failed, please check ingress"
     return 1
   fi
-  echo "For accesing UI, create an entry in /etc/hosts file for the IPs like '$ip  $tvkhost_name.com'"
-  echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name.com:$port"
+  echo "For accesing UI, create an entry in /etc/hosts file for the IPs like '$ip  $tvkhost_name'"
+  echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name:$port"
   echo "For https access, please refer - https://docs.trilio.io/kubernetes/management-console/user-interface/accessing-the-ui" 
 }
 
@@ -465,36 +465,10 @@ configure_loadbalancer_for_tvkUI()
 }
 
 
-
-#This module is used to create target to be used for TVK backup and restore
-create_target()
+create_doks_s3()
 {
-   if  [[ -z ${input_config} ]];then
-     echo -e "Target can be created on NFS or s3 compatible storage\n1.NFS(default) \n2.DOKs_S3"
-     read -r -p "select option: " target_type
-   else
-     if [[ $target_type == 'NFS' ]];then
-       target_type=1
-     elif [[ $target_type == 'DOKs_S3' ]];then
-       target_type=2
-     else
-       echo "Wrong value provided for target"
-     fi
-   fi
-   if [[ -z "$target_type" ]]; then
-      target_type=1
-   fi
-   case $target_type in
-     2)
-	ret=$(s3cmd --version 2>/dev/null)
-	if [[ -z $ret ]];then
-	  echo "This functionality requires s3cmd utility installed"
-	  echo "Please check README or follow https://s3tools.org/s3cmd"
-	  return 1
-	fi
-	#yes | sudo apt-get install s3cmd 1>> >(logit) 2>> >(logit)
-	#Create s3cfg_confg file for target creation
-	cat > s3cfg_config <<- EOM
+  #Create s3cfg_confg file for target creation
+  cat > s3cfg_config <<- EOM
 [default]
 access_key = access_key
 access_token =
@@ -573,61 +547,64 @@ website_endpoint = http://%(bucket)s.s3-website-%(location)s.amazonaws.com/
 website_error =
 website_index = index.html
 EOM
-	if  [[ -z ${input_config} ]];then
-          echo "Please go through https://docs.digitalocean.com/products/spaces/resources/s3cmd/ to know about options"
-          echo "for creation of bucket, please provide input"
-          read -r -p "Access_key: " access_key
-          read -r -p "Secret_key: " secret_key
-          read -r -p "Host Base (default - nyc3.digitaloceanspaces.com): " host_base
-	  read -r -p "Host Bucket (default - %(bucket)s.nyc3.digitaloceanspaces.com): " host_bucket
-	  read -r -p "gpg_passphrase (default - trilio): " gpg_passphrase
-          read -r -p "Bucket Name: " bucket_name
-          read -r -p "Target Name: " target_name
-          read -r -p "Target Namespace: " target_namespace
-	  read -r -p "thresholdCapacity (default - 1000Gi): " thresholdCapacity
-	  read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
-        fi
-	if [[ -z "$if_resource_exists_still_proceed" ]];then
-          if_resource_exists_still_proceed='y'
-        fi
-	if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>> >(logit)) ]];
-        then
-	  echo "Target with same name already exists"
-	  if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
-            exit 1
-	  else
-	    return 0
-          fi
-	fi
-	if [[ -z "$gpg_passphrase" ]];then
-	  gpg_passphrase="trilio"
-	fi
-	if [[ -z "$thresholdCapacity" ]];then
-	  thresholdCapacity='1000Gi'
-	fi
-        if [[ -z "$host_base" ]]; then
-          host_base="nyc3.digitaloceanspaces.com"
-        fi
-        if [[ -z "$host_bucket" ]]; then
-          host_bucket="%(bucket)s.nyc3.digitaloceanspaces.com"
-        fi
-        region="$( cut -d '.' -f 1 <<< "$host_base" )"
-        for i in access_key secret_key host_base host_bucket gpg_passphrase 
-        do
-          sed -i "s/^\($i\s*=\s*\).*$/\1${!i}/" s3cfg_config
-          sudo cp s3cfg_config "$HOME"/.s3cfg
-        done
-        #create bucket
-	ret_val=$(s3cmd mb s3://"$bucket_name" 2>> >(logit))
-        ret_code=$(echo "$ret_val" | grep 'Bucket already exists')
-	if [[ "$ret_code" ]]; then 
-          echo "WARNING: Bucket already exists"
-	else
-	  echo "$ret_val"
-        fi
-        #create S3 target
-        url="https://$host_base"
-	cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+  if  [[ -z ${input_config} ]];then
+    echo "Please go through https://docs.digitalocean.com/products/spaces/resources/s3cmd/ to know about options"
+    echo "for creation of bucket, please provide input"
+    read -r -p "Access_key: " access_key
+    read -r -p "Secret_key: " secret_key
+    read -r -p "Host Base (default - nyc3.digitaloceanspaces.com): " host_base
+    read -r -p "Host Bucket (default - %(bucket)s.nyc3.digitaloceanspaces.com): " host_bucket
+    read -r -p "gpg_passphrase (default - trilio): " gpg_passphrase
+    read -r -p "Bucket Name: " bucket_name
+    read -r -p "Target Name: " target_name
+    read -r -p "Target Namespace: " target_namespace
+    read -r -p "thresholdCapacity (default - 1000Gi): " thresholdCapacity
+    read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
+  fi
+  if [[ -z "$if_resource_exists_still_proceed" ]];then
+    if_resource_exists_still_proceed='y'
+  fi
+  if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>> >(logit)) ]];
+  then
+    echo "Target with same name already exists"
+    if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
+      exit 1
+    else
+      return 0
+    fi
+  fi
+  if [[ -z "$gpg_passphrase" ]];then
+    gpg_passphrase="trilio"
+  fi
+  if [[ -z "$thresholdCapacity" ]];then
+    thresholdCapacity='1000Gi'
+  fi
+  if [[ -z "$host_base" ]]; then
+    host_base="nyc3.digitaloceanspaces.com"
+  fi
+  if [[ -z "$host_bucket" ]]; then
+    host_bucket="%(bucket)s.nyc3.digitaloceanspaces.com"
+  fi
+  region="$( cut -d '.' -f 1 <<< "$host_base" )"
+  for i in access_key secret_key host_base host_bucket gpg_passphrase
+    do
+      sed -i "s/^\($i\s*=\s*\).*$/\1${!i}/" s3cfg_config
+      sudo cp s3cfg_config "$HOME"/.s3cfg
+    done
+  #create bucket
+  ret_val=$(s3cmd mb s3://"$bucket_name" 2>> >(logit))
+  ret_mgs=$?
+  if [[ $ret_mgs -ne 0 ]];then
+    ret_code=$(echo "$ret_val" | grep 'Bucket already exists')
+    if [[ "$ret_code" ]]; then
+      echo "WARNING: Bucket already exists"
+    else
+      echo "Error in creating spaces,please check credentials"
+    fi
+  fi
+  #create S3 target
+  url="https://$host_base"
+  cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: Target
 metadata:
@@ -644,11 +621,215 @@ spec:
     region: "$region"
   thresholdCapacity: $thresholdCapacity
 EOF
-        retcode=$?
-        if [ "$retcode" -ne 0 ];then
-          echo "Target creation failed"
+  retcode=$?
+  if [ "$retcode" -ne 0 ];then
+    echo "Target creation failed"
+    return 1
+  fi
+}
+
+#Function to create Aws s3 target
+create_aws_s3()
+{
+  cat > s3cfg_config <<- EOM
+[default]
+access_key = ACCESSKEY
+access_token =
+add_encoding_exts =
+add_headers =
+bucket_location = US
+cache_file =
+cloudfront_host = cloudfront.amazonaws.com
+default_mime_type = binary/octet-stream
+delay_updates = False
+delete_after = False
+delete_after_fetch = False
+delete_removed = False
+dry_run = False
+enable_multipart = True
+encoding = UTF-8
+encrypt = False
+expiry_date =
+expiry_days =
+expiry_prefix =
+follow_symlinks = False
+force = False
+get_continue = False
+gpg_command = /usr/bin/gpg
+gpg_decrypt = %(gpg_command)s -d --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
+gpg_encrypt = %(gpg_command)s -c --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
+gpg_passphrase =
+guess_mime_type = True
+host_base = s3.amazonaws.com
+host_bucket = %(bucket)s.s3.amazonaws.com
+human_readable_sizes = False
+ignore_failed_copy = False
+invalidate_default_index_on_cf = False
+invalidate_default_index_root_on_cf = True
+invalidate_on_cf = False
+list_md5 = False
+log_target_prefix =
+max_delete = -1
+mime_type =
+multipart_chunk_size_mb = 15
+preserve_attrs = True
+progress_meter = True
+proxy_host =
+proxy_port = 0
+put_continue = False
+recursive = False
+recv_chunk = 4096
+reduced_redundancy = False
+restore_days = 1
+secret_key = SECRETKEY
+send_chunk = 4096
+server_side_encryption = False
+simpledb_host = sdb.amazonaws.com
+skip_existing = False
+socket_timeout = 300
+urlencoding_mode = normal
+use_https = True
+use_mime_magic = True
+verbosity = WARNING
+website_endpoint = http://%(bucket)s.s3-website-% (location)s.amazonaws.com/
+website_error =
+website_index = index.html
+EOM
+  if  [[ -z ${input_config} ]];then
+    echo "Please go through https://linux.die.net/man/1/s3cmd to know about options"
+    echo "for creation of bucket, please provide input"
+    read -r -p "Access_key: " access_key
+    read -r -p "Secret_key: " secret_key
+    read -r -p "Host Base (default - s3.amazonaws.com): " host_base
+    read -r -p "Host Bucket (default - %(bucket)s.s3.amazonaws.com): " host_bucket
+    read -r -p "Bucket Location Region to create bucket in. As of now the regions are:
+                        us-east-1, us-west-1, us-west-2, eu-west-1, eu-
+                        central-1, ap-northeast-1, ap-southeast-1, ap-
+                        southeast-2, sa-east-1 (default - us-east-1): " bucket_location
+    read -r -p "Bucket Name: " bucket_name
+    read -r -p "Target Name: " target_name
+    read -r -p "Target Namespace: " target_namespace
+    read -r -p "thresholdCapacity (default - 1000Gi): " thresholdCapacity
+    read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
+  fi
+  if [[ -z "$if_resource_exists_still_proceed" ]];then
+    if_resource_exists_still_proceed='y'
+  fi
+  if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>> >(logit)) ]];
+  then
+    echo "Target with same name already exists"
+    if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
+      exit 1
+    else
+      return 0
+    fi
+  fi
+  if [[ -z "$thresholdCapacity" ]];then
+    thresholdCapacity='1000Gi'
+  fi
+  if [[ -z "$host_base" ]]; then
+    host_base="s3.amazonaws.com"
+  fi
+  if [[ -z "$host_bucket" ]];then
+    host_bucket="%(bucket)s.s3.amazonaws.com"
+  fi
+  if [[ -z "$bucket_location" ]];then
+    bucket_location="us-east-1"
+  fi
+  region=$(s3cmd --config /home/nikita/tvk_install/s3cfg_config_aws info s3://testtrilio-bucket/ | grep Location | cut -d':' -f2- | sed 's/^ *//g')
+    for i in access_key secret_key host_base host_bucket bucket_location
+    do
+      sed -i "s/^\($i\s*=\s*\).*$/\1${!i}/" s3cfg_config
+      sudo cp s3cfg_config "$HOME"/.s3cfg
+    done
+  #create bucket
+  ret_val=$(s3cmd mb s3://"$bucket_name" 2>> >(logit))
+  ret_mgs=$?
+  if [[ "$ret_mgs" -ne 0 ]];then
+    ret_code=$(echo "$ret_val" | grep 'Bucket already exists')
+    if [[ "$ret_code" ]]; then
+      echo "WARNING: Bucket already exists"
+    else
+      echo "Error in creating spaces,please check credentials"
+    fi
+  fi
+  #create S3 target
+  url="https://s3.amazonaws.com"
+  cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+apiVersion: triliovault.trilio.io/v1
+kind: Target
+metadata:
+  name: ${target_name}
+  namespace: ${target_namespace}
+spec:
+  type: ObjectStore
+  vendor: Other
+  objectStoreCredentials:
+    url: "$url"
+    accessKey: "$access_key"
+    secretKey: "$secret_key"
+    bucketName: "$bucket_name"
+    region: "$region"
+  thresholdCapacity: $thresholdCapacity
+EOF
+  retcode=$?
+  if [ "$retcode" -ne 0 ];then
+    echo "Target creation failed"
+    return 1
+  fi
+}
+
+#This module is used to create target to be used for TVK backup and restore
+create_target()
+{
+   if  [[ -z ${input_config} ]];then
+     echo -e "Target can be created on NFS or s3 compatible storage\n1.NFS(default) \n2.S3"
+     read -r -p "select option: " target_type
+   else
+     if [[ $target_type == 'NFS' ]];then
+       target_type=1
+     elif [[ $target_type == 'S3' ]];then
+       target_type=2
+     else
+       echo "Wrong value provided for target"
+     fi
+   fi
+   if [[ -z "$target_type" ]]; then
+      target_type=1
+   fi
+   case $target_type in
+     2)
+	ret=$(s3cmd --version 2>/dev/null)
+        if [[ -z $ret ]];then
+          echo "This functionality requires s3cmd utility installed"
+          echo "Please check README or follow https://s3tools.org/s3cmd"
           return 1
-        fi
+	fi
+	if  [[ -z ${input_config} ]];then
+	  echo -e "Please select vendor\n1.Digital_Ocean\n2.Amazon_AWS"
+	  read -r -p "select option: "
+	else
+	  if [[ $vendor_type == "Digital_Ocean" ]];then
+	    vendor_type=1
+          elif [[ $vendor_type == "Amazon_AWS" ]];then
+	    vendor_type=2
+          else
+	    echo "Wrong value provided for target"
+	  fi
+	fi
+        case $target_type in
+	  1)
+	    create_doks_s3
+            ;;
+          2)
+	    create_aws_s3
+	    ;;
+	  *)
+            echo "Wrong selection"
+            return 1
+            ;;
+        esac
+        shift
 	;;
      1)
 	if  [[ -z ${input_config} ]];then
