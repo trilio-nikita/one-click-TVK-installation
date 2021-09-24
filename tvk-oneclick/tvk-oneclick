@@ -755,6 +755,10 @@ sample_test()
        exit 1
      fi
    fi
+   if [[ -z $backup_way ]];then
+     echo "Please provide valid backup-way..exiting.."
+     exit 1
+   fi
    #Create backupplan template
    cat > backupplan.yaml <<- EOM
 apiVersion: triliovault.trilio.io/v1
@@ -992,7 +996,6 @@ metadata:
   namespace: ${backup_namespace}
 spec:
   type: Full
-  scheduleType: Periodic
   backupPlan:
     name: ${bk_plan_name}
     namespace: ${backup_namespace}
@@ -1023,11 +1026,18 @@ EOF
      if [[ -z "$restore_namespace" ]]; then
 	restore_namespace="trilio-test-rest"
      fi
-     if ! kubectl create ns "$restore_namespace" 1>> >(logit) 2>> >(logit) 
-     then 
-       echo "Error while creating $restore_namespace namespace"
-       exit 1
-     fi  
+     if ! kubectl get ns "$restore_namespace" 1>> >(logit) 2>> >(logit)
+     then
+       echo "Namespace with name $restore_namespace already Exists"
+       if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
+          exit 1
+       fi
+       if ! kubectl create ns "$restore_namespace" 1>> >(logit) 2>> >(logit) 
+       then 
+         echo "Error while creating $restore_namespace namespace"
+         exit 1
+       fi  
+     fi
      if [[ -z "$restore_name" ]]; then
 	restore_name="trilio-test-restore"
      fi
@@ -1047,8 +1057,6 @@ metadata:
   name: ${restore_name}
   namespace: ${restore_namespace}
 spec:
-  backupPlan:
-    name: ${bk_plan_name}
   source:
     type: Backup
     backup:
