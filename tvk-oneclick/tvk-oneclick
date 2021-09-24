@@ -465,12 +465,18 @@ configure_loadbalancer_for_tvkUI()
 }
 
 
-create_doks_s3()
+
+call_s3cfg_doks()
 {
-  #Create s3cfg_confg file for target creation
+  access_key=$1
+  secret_key=$2
+  host_base=$3
+  host_bucket=$4
+  gpg_passphrase=$5
+
   cat > s3cfg_config <<- EOM
 [default]
-access_key = access_key
+access_key = ${access_key}
 access_token =
 add_encoding_exts =
 add_headers =
@@ -498,10 +504,10 @@ get_continue = False
 gpg_command = /usr/bin/gpg
 gpg_decrypt = %(gpg_command)s -d --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
 gpg_encrypt = %(gpg_command)s -c --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
-gpg_passphrase = trilio
+gpg_passphrase = ${gpg_passphrase}
 guess_mime_type = True
-host_base = nyc3.digitaloceanspaces.com
-host_bucket = %(bucket)s.nyc3.digitaloceanspaces.com
+host_base = ${host_base}
+host_bucket = ${host_bucket}
 human_readable_sizes = False
 invalidate_default_index_on_cf = False
 invalidate_default_index_root_on_cf = True
@@ -527,7 +533,7 @@ reduced_redundancy = False
 requester_pays = False
 restore_days = 1
 restore_priority = Standard
-secret_key = secret_key
+secret_key = ${secret_key}
 send_chunk = 65536
 server_side_encryption = False
 signature_v2 = False
@@ -547,6 +553,10 @@ website_endpoint = http://%(bucket)s.s3-website-%(location)s.amazonaws.com/
 website_error =
 website_index = index.html
 EOM
+}
+
+create_doks_s3()
+{
   if  [[ -z ${input_config} ]];then
     echo "Please go through https://docs.digitalocean.com/products/spaces/resources/s3cmd/ to know about options"
     echo "for creation of bucket, please provide input"
@@ -585,14 +595,10 @@ EOM
   if [[ -z "$host_bucket" ]]; then
     host_bucket="%(bucket)s.nyc3.digitaloceanspaces.com"
   fi
+  call_s3cfg_doks "$access_key" "$secret_key" "$host_base" "$host_bucket" "$gpg_passphrase"
   region="$( cut -d '.' -f 1 <<< "$host_base" )"
-  for i in access_key secret_key host_base host_bucket gpg_passphrase
-    do
-      sed -i "s/^\($i\s*=\s*\).*$/\1${!i}/" s3cfg_config
-      sudo cp s3cfg_config "$HOME"/.s3cfg
-    done
   #create bucket
-  ret_val=$(s3cmd mb s3://"$bucket_name" 2>> >(logit))
+  ret_val=$(s3cmd --config s3cfg_config mb s3://"$bucket_name" 2>> >(logit))
   ret_mgs=$?
   if [[ $ret_mgs -ne 0 ]];then
     ret_code=$(echo "$ret_val" | grep 'Bucket already exists')
@@ -628,16 +634,20 @@ EOF
   fi
 }
 
-#Function to create Aws s3 target
-create_aws_s3()
+call_s3cfg_aws()
 {
+  access_key=$1
+  secret_key=$2
+  host_base=$3
+  host_bucket=$4
+  bucket_location=$5
   cat > s3cfg_config <<- EOM
 [default]
-access_key = ACCESSKEY
+access_key = ${access_key}
 access_token =
 add_encoding_exts =
 add_headers =
-bucket_location = US
+bucket_location = ${bucket_location}
 cache_file =
 cloudfront_host = cloudfront.amazonaws.com
 default_mime_type = binary/octet-stream
@@ -660,8 +670,8 @@ gpg_decrypt = %(gpg_command)s -d --verbose --no-use-agent --batch --yes --passph
 gpg_encrypt = %(gpg_command)s -c --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
 gpg_passphrase =
 guess_mime_type = True
-host_base = s3.amazonaws.com
-host_bucket = %(bucket)s.s3.amazonaws.com
+host_base = ${host_base}
+host_bucket = ${host_bucket}
 human_readable_sizes = False
 ignore_failed_copy = False
 invalidate_default_index_on_cf = False
@@ -681,7 +691,7 @@ recursive = False
 recv_chunk = 4096
 reduced_redundancy = False
 restore_days = 1
-secret_key = SECRETKEY
+secret_key = ${secret_key}
 send_chunk = 4096
 server_side_encryption = False
 simpledb_host = sdb.amazonaws.com
@@ -695,6 +705,11 @@ website_endpoint = http://%(bucket)s.s3-website-% (location)s.amazonaws.com/
 website_error =
 website_index = index.html
 EOM
+}
+
+#Function to create Aws s3 target
+create_aws_s3()
+{
   if  [[ -z ${input_config} ]];then
     echo "Please go through https://linux.die.net/man/1/s3cmd to know about options"
     echo "for creation of bucket, please provide input"
@@ -736,24 +751,21 @@ EOM
   if [[ -z "$bucket_location" ]];then
     bucket_location="us-east-1"
   fi
-  region=$(s3cmd --config /home/nikita/tvk_install/s3cfg_config_aws info s3://testtrilio-bucket/ | grep Location | cut -d':' -f2- | sed 's/^ *//g')
-    for i in access_key secret_key host_base host_bucket bucket_location
-    do
-      sed -i "s/^\($i\s*=\s*\).*$/\1${!i}/" s3cfg_config
-      sudo cp s3cfg_config "$HOME"/.s3cfg
-    done
+  call_s3cfg_aws "$access_key" "$secret_key" "$host_base" "$host_bucket" "$bucket_location"
   #create bucket
-  ret_val=$(s3cmd mb s3://"$bucket_name" 2>> >(logit))
+  ret_val=$(s3cmd --config s3cfg_config mb s3://"$bucket_name" 2>> >(logit))
   ret_mgs=$?
   if [[ "$ret_mgs" -ne 0 ]];then
     ret_code=$(echo "$ret_val" | grep 'Bucket already exists')
     if [[ "$ret_code" ]]; then
       echo "WARNING: Bucket already exists"
     else
-      echo "Error in creating spaces,please check credentials"
+      echo "Error in creating bucket,please check credentials"
+      return 1
     fi
   fi
   #create S3 target
+  region=$(s3cmd --config s3cfg_config info s3://"$bucket_name"/ | grep Location | cut -d':' -f2- | sed 's/^ *//g')
   url="https://s3.amazonaws.com"
   cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
