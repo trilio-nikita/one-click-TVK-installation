@@ -326,7 +326,7 @@ print(soup.body.find('div', attrs={'class':'yaml-content'}).text)
 sys.stdout.close()
 result = subprocess.check_output("kubectl apply -f license_file1.yaml", shell=True)
 EOF
-  if ! kubectl get license 1>> >(logit) 2>> >(logit);then
+  if ! kubectl get license 1>> >(logit) 2>> >(logit) | grep -q Activated;then
     echo "License installation failed"
     exit 1
   else
@@ -955,6 +955,14 @@ sample_test()
      echo "Please provide valid backup-way..exiting.."
      return 1
    fi
+
+   #Check if yq is installed
+   ret=$(yq -V 2>/dev/null)
+   if [[ -z $ret ]];then
+     echo "This functionality requires yq utility installed"
+     echo "Please check README or follow https://github.com/mikefarah/yq"
+     return 1
+   fi
    #Create backupplan template
    cat > backupplan.yaml <<- EOM
 apiVersion: triliovault.trilio.io/v1
@@ -966,18 +974,14 @@ spec:
   backupNamespace: trilio-test-backup
   backupConfig:
     target:
-      name: demo-target
-      namespace: default
+      name: 
+      namespace: 
     schedulePolicy:
       incrementalCron:
         schedule: "* 0 * * *"
     retentionPolicy:
       name: sample-policy
       namespace: default
-  backupPlanComponents:
-    custom:
-      - matchLabels:
-          app: mysql-qa
 EOM
    case $backup_way in
       1)
@@ -1015,11 +1019,11 @@ EOM
 	  helm repo add bitnami https://charts.bitnami.com/bitnami 1>> >(logit) 2>> >(logit)
           helm install my-wordpress bitnami/wordpress -n $backup_namespace 1>> >(logit) 2>> >(logit)
 	  echo "Installing Application"
-	  runtime="10 minute"
+	  runtime=10
           spin='-\|/'
           i=0
-          endtime=$(date -ud "$runtime" +%s)
-	  while [[ $(date -u +%s) -le $endtime ]] && kubectl get pod -l  app.kubernetes.io/instance=my-wordpress -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
+          endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
+	  while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pod -l  app.kubernetes.io/instance=my-wordpress -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
           do
             i=$(( (i+1) %4 ))
             printf "\r %s" "${spin:$i:1}"
@@ -1043,11 +1047,12 @@ EOM
           return 1
         fi
         echo "Installing MySQL Operator..."
-        runtime="10 minute"
+	echo "Installing Application"
+        runtime=10
         spin='-\|/'
         i=0
-        endtime=$(date -ud "$runtime" +%s)
-        while [[ $(date -u +%s) -le $endtime ]] && kubectl get pod -l app=mysql-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
+        endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
+        while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pod -l app=mysql-operator -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
         do
           i=$(( (i+1) %4 ))
           printf "\r %s" "${spin:$i:1}"
@@ -1060,20 +1065,20 @@ EOM
         #Create a MySQL cluster
         kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster-secret.yaml -n $backup_namespace 2>> >(logit)
         kubectl apply -f https://raw.githubusercontent.com/bitpoke/mysql-operator/master/examples/example-cluster.yaml -n $backup_namespace 2>> >(logit)
-        runtime="15 minute"
+	runtime=15
         spin='-\|/'
         i=0
-        endtime=$(date -ud "$runtime" +%s)
+        endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
         echo "Installing MySQL cluster..."
         sleep 10
-        while [[ $(date -u +%s) -le $endtime ]] && kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
+        while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
         do
           i=$(( (i+1) %4 ))
           printf "\r %s" "${spin:$i:1}"
           sleep .1
         done
 	sleep 5
-	while [[ $(date -u +%s) -le $endtime ]] && kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
+	while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
         do
           i=$(( (i+1) %4 ))
           printf "\r %s" "${spin:$i:1}"
@@ -1109,17 +1114,17 @@ EOM
             helm install mongotest bitnami/mongodb -n $backup_namespace
 	  } 2>> >(logit)
 	  echo "Installing App..."
-	  runtime="15 minute"
+	  runtime=15
           spin='-\|/'
           i=0
-          endtime=$(date -ud "$runtime" +%s)
-	  while [[ $(date -u +%s) -le $endtime ]] && kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q -w False
+          endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
+	  while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q -w False
           do
             i=$(( (i+1) %4 ))
             printf "\r %s" "${spin:$i:1}"
             sleep .1
           done
-	  if kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].stat}" | grep -q False;then
+	  if kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
             echo "Mongodb installation failed"
             return 1
           fi

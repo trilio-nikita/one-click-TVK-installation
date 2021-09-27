@@ -8,9 +8,10 @@ some sample backups and restore.
 
 1. krew - kubectl-plugin manager. Install from [here](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
 2. kubectl - kubernetes command-line tool. Install from [here](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-3. Python3(version >= 3.9)
-4. Helm (version >= 3)
+3. Helm (version >= 3)
+4. Python3(version >= 3.9, with requests package installed - pip3 install requests)
 5. S3cmd. Install s3cmd from [here](https://acloud24.com/blog/installation-and-configuration-of-s3cmd-under-linux/)
+6. yq(version >= 4). Information can be found @[here](https://github.com/mikefarah/yq) 
 
 
 **Supported OS and Architectures**:
