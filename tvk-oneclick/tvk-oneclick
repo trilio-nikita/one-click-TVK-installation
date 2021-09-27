@@ -819,7 +819,7 @@ create_target()
 	fi
 	if  [[ -z ${input_config} ]];then
 	  echo -e "Please select vendor\n1.Digital_Ocean\n2.Amazon_AWS"
-	  read -r -p "select option: "
+	  read -r -p "select option: " vendor_type
 	else
 	  if [[ $vendor_type == "Digital_Ocean" ]];then
 	    vendor_type=1
@@ -829,7 +829,7 @@ create_target()
 	    echo "Wrong value provided for target"
 	  fi
 	fi
-        case $target_type in
+        case $vendor_type in
 	  1)
 	    create_doks_s3
             ;;
@@ -1080,6 +1080,13 @@ EOM
           printf "\r %s" "${spin:$i:1}"
           sleep .1
         done
+	sleep 5
+	while [[ $(date -u +%s) -le $endtime ]] && kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False
+        do
+          i=$(( (i+1) %4 ))
+          printf "\r %s" "${spin:$i:1}"
+          sleep .1
+        done
         if kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace  -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q False;then
           echo "MySQL cluster installation failed"
           return 1
@@ -1114,7 +1121,7 @@ EOM
           spin='-\|/'
           i=0
           endtime=$(date -ud "$runtime" +%s)
-	  while [[ $(date -u +%s) -le $endtime ]] && kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -w False
+	  while [[ $(date -u +%s) -le $endtime ]] && kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o  jsonpath="{.items[*].status.conditions[*].status}" | grep -q -w False
           do
             i=$(( (i+1) %4 ))
             printf "\r %s" "${spin:$i:1}"
