@@ -91,14 +91,13 @@ wait_install()
   spin='-\|/'
   i=0
   #endtime=$(date -ud "$runtime" +%s)
-  secs=$(perl -e 'print time(), "\n"')
-  ((endtime=secs+$runtime*60))
+  endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
   if [[ -z ${endtime} ]];then
     echo "There is some issue with date usage, please check the pre-requsites in README page" 1>> >(logit) 2>> >(logit)
     echo "Something went wrong..terminating" 2>> >(logit)
   fi
   val1=$(eval "$2")
-  while [[ $(perl -e 'print time(), "\n"') -le $endtime ]] && [[ "" == "$val1" ]] || [[ "$val1" == '{}' ]]
+  while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && [[ "" == "$val1" ]] || [[ "$val1" == '{}' ]]
   do
     i=$(( (i+1) %4 ))
     printf "\r %s" "${spin:$i:1}"
@@ -306,13 +305,6 @@ EOF
 #This module is use to install license
 install_license(){
   echo "Installing Freetrial license..."
-  #Install required packages
-  {
-    sudo apt update
-    yes | sudo apt install python3-pip
-    pip3 install beautifulsoup4 
-    pip3 install lxml 
-  } 1>> >(logit) 2>> >(logit)
   cat <<EOF | python3
 #!/usr/bin/python3
 
@@ -1401,7 +1393,7 @@ logit() {
      # shellcheck disable=SC2162
     while read
     do
-      time=$(perl -MPOSIX -le 'print strftime "%F %T", localtime $^T') 
+      time=$(python3 -c "import datetime;e = datetime.datetime.now();print(\"%s\" % e)") 
       echo "$time $REPLY" >> "${LOG_FILE}"
       #printf "%(%Y-%m-%d %T)T %s\n" -1 "$REPLY"  >> "${LOG_FILE}"
     done
