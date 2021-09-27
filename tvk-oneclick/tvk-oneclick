@@ -560,7 +560,7 @@ create_doks_s3()
     read -r -p "Bucket Name: " bucket_name
     read -r -p "Target Name: " target_name
     read -r -p "Target Namespace: " target_namespace
-    read -r -p "thresholdCapacity (default - 1000Gi): " thresholdCapacity
+    read -r -p "thresholdCapacity.(Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
     read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
   fi
   if [[ -z "$if_resource_exists_still_proceed" ]];then
@@ -716,7 +716,7 @@ create_aws_s3()
     read -r -p "Bucket Name: " bucket_name
     read -r -p "Target Name: " target_name
     read -r -p "Target Namespace: " target_namespace
-    read -r -p "thresholdCapacity (default - 1000Gi): " thresholdCapacity
+    read -r -p "thresholdCapacity(Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
     read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
   fi
   if [[ -z "$if_resource_exists_still_proceed" ]];then
@@ -842,7 +842,7 @@ create_target()
           read -r -p "namespace: " target_namespace
           read -r -p "Export Path: " nfs_path
           read -r -p "NFSoption (default - nfsvers=4): " nfs_options
-          read -r -p "thresholdCapacity (default - 1000Gi): " thresholdCapacity
+          read -r -p "thresholdCapacity(Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
 	  read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
 	fi
         if [[ -z "$if_resource_exists_still_proceed" ]];then
