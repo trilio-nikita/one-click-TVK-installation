@@ -103,11 +103,11 @@ kubectl tvk-oneclick [options]
 - With `-n`:
 
 ```shell script
-kubectl tvk-preflight -n
+kubectl tvk-oneclick -n
 ```
 
 - Without `-n`:
 
 ```shell script
-kubectl tvk-preflight -i -c -t -s
+kubectl tvk-oneclick -i -c -t -s
 ```

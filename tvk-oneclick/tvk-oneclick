@@ -400,7 +400,7 @@ configure_nodeport_for_tvkui()
     return 1
   fi
   echo "For accesing UI, create an entry in /etc/hosts file for the IPs like '$ip  $tvkhost_name'"
-  echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name:$port"
+  echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name:$port/login"
   echo "For https access, please refer - https://docs.trilio.io/kubernetes/management-console/user-interface/accessing-the-ui" 
 }
 
@@ -1406,4 +1406,10 @@ logit() {
 
 LOG_FILE="/tmp/tvk_oneclick_stderr"
 
+ret=$(python3 --version 2>/dev/null)
+if [[ -z $ret ]];then
+  echo "Plugin requires python3 installed"
+  echo "Please install and check"
+  return 1
+fi
 main "$@"
