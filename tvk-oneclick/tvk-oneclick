@@ -86,7 +86,7 @@ wait_install()
     echo "Something went wrong..terminating" 2>> >(logit)
   fi
   val1=$(eval "$2")
-  while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && [[ "" == "$val1" ]] || [[ "$val1" == '{}' ]]
+  while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && [[ "" == "$val1" ]] || [[ "$val1" == '{}' ]] || [[ "$val1" == 'map[]' ]];
   do
     i=$(( (i+1) %4 ))
     printf "\r %s" "${spin:$i:1}"
@@ -476,7 +476,7 @@ configure_loadbalancer_for_tvkUI()
   cmd="kubectl get svc k8s-triliovault-ingress-gateway -n $get_ns -o 'jsonpath={.status.loadBalancer}'"
   wait_install 20 "$cmd"
   val_status=$(kubectl get svc k8s-triliovault-ingress-gateway -n "$get_ns" -o 'jsonpath={.status.loadBalancer}')
-  if [[ $val_status == '{}' ]]
+  if [[ $val_status == '{}' ]] || [[ $val_status == 'map[]' ]]
   then
     echo "Loadbalancer taking time to get External IP"
     return 1
