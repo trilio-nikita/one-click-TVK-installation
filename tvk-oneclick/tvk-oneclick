@@ -312,6 +312,7 @@ EOF
 install_license(){
   tvk_ns=$1
   echo "Installing required packages.."
+  pip3 install requests 1>> >(logit) 2>> >(logit)
   pip3 install beautifulsoup4 1>> >(logit) 2>> >(logit)
   pip3 install lxml 1>> >(logit) 2>> >(logit)
   echo "Installing Freetrial license..."
