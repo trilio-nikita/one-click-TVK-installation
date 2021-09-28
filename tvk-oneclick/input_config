@@ -7,6 +7,7 @@ SAMPLE_TEST=True 				#Whether or not sample test should be executed [True, False
 storage_class=   				#Specify storage class name to be used for pvc to be created
 operator_version= 				#Specify TVK operator version
 triliovault_manager_version='v2.1.1-alpha' 	#Specify TVK Manager version
+tvk_ns='default'				#Specify namespace name in which TVK should get install.
 if_resource_exists_still_proceed=True   	#Specify if plugin should proceed even if resource exists
 ui_access_type='Loadbalancer' 			#Specify the way in which TVK UI should be configured['Loadbalancer','Nodeport','PortForwarding']
 domain='domainname'   				#Specify the domain name, this should be present or added in DNS server
