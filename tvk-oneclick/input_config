@@ -14,6 +14,7 @@ domain='domainname'   				#Specify the domain name, this should be present or ad
 tvkhost_name='tvkdemo'	      			#Specify TVK host name
 cluster_name='trilio-test2'   			#Specify cluster name
 vendor_type='Digital_Ocean'      		#Specify vendor name for s3 bucket ['Digital_Ocean','Amazon_AWS']
+doctl_token=''					#Spevify Digital Ocean token [ https://cloud.digitalocean.com/account/api/tokens. ]
 target_type='S3'				#Specify Target type ['NFS','S3']
 access_key='access-key'				#Specify access_key
 secret_key='secret-key'				#Specify secret key
