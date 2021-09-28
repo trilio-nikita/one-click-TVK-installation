@@ -396,6 +396,12 @@ configure_ui()
 #This function is used to configure TVK UI through nodeport
 configure_nodeport_for_tvkui()
 {
+  ret=$(doctl auth list 2>/dev/null)
+  if [[ -z $ret ]];then
+    echo "This functionality requires doctl installed"
+    echo "Please follow  to install https://docs.digitalocean.com/reference/doctl/how-to/install/ doctl"
+    return 1
+  fi
   if  [[ -z ${input_config} ]];then
     read -r -p "Please enter host name for tvk ingress (default - tvk-doks.com): " tvkhost_name
   fi
@@ -419,8 +425,11 @@ configure_nodeport_for_tvkui()
     echo "TVK UI configuration failed, please check ingress"
     return 1
   fi
+  cluster_name=$(kubectl config view --minify -o jsonpath='{.clusters[].name}' | cut -d'-' -f3-)
+  doctl kubernetes cluster kubeconfig show "${cluster_name}" > config_"${cluster_name}" 2>> >(logit)
   echo "Please add '$ip $tvkhost_name' entry to your /etc/host file before launching the console"
   echo "After creating an entry,TVK UI can be accessed through http://$tvkhost_name:$port/login"
+  echo "provide config file stored at location: $PWD/config_${cluster_name}"
   echo "For https access, please refer - https://docs.trilio.io/kubernetes/management-console/user-interface/accessing-the-ui" 
 }
 
