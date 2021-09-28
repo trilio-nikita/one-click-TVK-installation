@@ -61,8 +61,8 @@ vercomp () {
     then
         return 0
     fi
-    ret=$(python3 -c "from packaging import version;print(version.parse($1) < version.parse($2))")
-    if $ret;then
+    ret=$(python3 -c "from packaging import version;print(version.parse(\"$1\") < version.parse(\"$2\"))")
+    if [[ $ret == "True" ]];then
       return 2
     else
       return 1
@@ -1029,6 +1029,10 @@ spec:
       name: sample-policy
       namespace: default
 EOM
+   ret_code=$?
+   if [ "$ret_code" -ne 0 ];then
+     echo "Cannot write backupplan.yaml file, please check file system permissions"
+   fi
    case $backup_way in
       1)
         ## Install mysql helm chart
@@ -1314,8 +1318,8 @@ spec:
   source:
     type: Backup
     backup:
-      namespace: ${backup_name}
-      name: ${backup_namespace}
+      namespace: ${backup_namespace}
+      name: ${backup_name}
     target:
       name: ${target_name}
       namespace: ${target_namespace}
