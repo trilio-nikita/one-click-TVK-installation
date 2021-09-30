@@ -325,7 +325,6 @@ install_license(){
   pip3 install beautifulsoup4 1>> >(logit) 2>> >(logit)
   pip3 install lxml 1>> >(logit) 2>> >(logit)
   echo "Installing Freetrial license..."
-  sleep 2
   cat <<EOF | python3
 #!/usr/bin/python3
 
@@ -347,6 +346,7 @@ print(soup.body.find('div', attrs={'class':'yaml-content'}).text)
 sys.stdout.close()
 result = subprocess.check_output("kubectl apply -f license_file1.yaml -n $tvk_ns", shell=True)
 EOF
+  sleep 3
   ret=$(kubectl get license -n "$tvk_ns" 2>> >(logit) | grep -q Activated)
   ret_code=$?
   if [ "$ret_code" -ne 0 ];then
