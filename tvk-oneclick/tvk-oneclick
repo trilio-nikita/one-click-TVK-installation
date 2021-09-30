@@ -27,7 +27,7 @@ preflight_checks()
     fi
   fi 
   if  [[ -z "${input_config}" ]];then
-    read -r -p "Provide storageclass to be used for TVK/Application Installation(storageclass with default annotation will be take as default): " storage_class
+    read -r -p "Provide storageclass to be used for TVK/Application Installation (storageclass with default annotation will be take as default): " storage_class
   fi
   if [[ -z "$storage_class" ]];then
     storage_class=$(kubectl get storageclass | grep -w '(default)' | awk  '{print $1}')
@@ -47,7 +47,7 @@ preflight_checks()
   else 
     if  [[ -z "${input_config}" ]];then
       echo "There are some failures"
-      read -r -p "Do you want to proceed?y/n: " proceed_even_PREFLIGHT_fail
+      read -r -p "Do you want to proceed? y/n: " proceed_even_PREFLIGHT_fail
     fi
     if [[ "$proceed_even_PREFLIGHT_fail" != "Y" ]] && [[ "$proceed_even_PREFLIGHT_fail" != "y" ]];then
       exit 1
@@ -206,7 +206,7 @@ install_tvk()
   #set value for tvm_name
   tvm_name="triliovault-manager"
   #check if TVK manager is installed
-  if [[ $(kubectl get pods -l app=k8s-triliovault-control-plane -A 2>/dev/null) ]] && [[ $(kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null) ]];then
+  if [[ $(kubectl get pods -l app=k8s-triliovault-control-plane -A 2>/dev/null) ]] && [[ $(kubectl get pods -l app=k8s-triliovault-admission-webhook -A 2>/dev/null) ]];then
     echo "Triliovault manager is already installed"
     if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
       exit 1
@@ -224,18 +224,19 @@ install_tvk()
       if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
         exit 1
       fi
+      install_license "$tvk_ns"
       return
     else
       echo "Upgrading triliovault manager.."
       tvm_upgrade=1
-      vercomp  "$new_triliovault_manager_version" "2.5"
+      vercomp  "2.5" "$new_triliovault_manager_version"
       ret_val=$?
       if [[ $ret_val == 2 ]] || [[ $ret_val == 1 ]];
       then
-        svc_type=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.spec.type}')
+        svc_type=$(kubectl get svc k8s-triliovault-ingress-gateway -n "$get_ns" -o 'jsonpath={.spec.type}')
         if [[ $svc_type == LoadBalancer ]];
         then
-          get_host=$(kubectl get ingress k8s-triliovault-ingress-master -o 'jsonpath={.spec.rules[0].host}')
+          get_host=$(kubectl get ingress k8s-triliovault-ingress-master -n "$get_ns" -o 'jsonpath={.spec.rules[0].host}')
   cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: TrilioVaultManager
@@ -452,7 +453,7 @@ configure_loadbalancer_for_tvkUI()
   fi
   if  [[ -z ${input_config} ]];then
     echo "To use DigitalOcean DNS, you need to register a domain name with a registrar and update your domain’s NS records to point to DigitalOcean’s name servers."
-    read -r -p "Please enter domainname for cluster(Domain name you have registered and added in Doks console): " domain
+    read -r -p "Please enter domainname for cluster (Domain name you have registered and added in Doks console): " domain
     read -r -p "Please enter host name for tvk ingress (default - tvk-doks): " tvkhost_name
     read -r -p "Please enter auth token for doctl: " doctl_token
   fi
@@ -609,7 +610,7 @@ create_doks_s3()
     read -r -p "Bucket Name: " bucket_name
     read -r -p "Target Name: " target_name
     read -r -p "Target Namespace: " target_namespace
-    read -r -p "thresholdCapacity.(Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
+    read -r -p "thresholdCapacity (Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
     read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
   fi
   if [[ -z "$if_resource_exists_still_proceed" ]];then
@@ -765,7 +766,7 @@ create_aws_s3()
     read -r -p "Bucket Name: " bucket_name
     read -r -p "Target Name: " target_name
     read -r -p "Target Namespace: " target_namespace
-    read -r -p "thresholdCapacity(Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
+    read -r -p "thresholdCapacity (Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
     read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
   fi
   if [[ -z "$if_resource_exists_still_proceed" ]];then
@@ -836,7 +837,7 @@ EOF
 create_target()
 {
    if  [[ -z ${input_config} ]];then
-     echo -e "Target can be created on NFS or s3 compatible storage\n1.NFS(default) \n2.S3"
+     echo -e "Target can be created on NFS or s3 compatible storage\n1.NFS (default) \n2.S3"
      read -r -p "select option: " target_type
    else
      if [[ $target_type == 'NFS' ]];then
@@ -891,7 +892,7 @@ create_target()
           read -r -p "namespace: " target_namespace
           read -r -p "Export Path: " nfs_path
           read -r -p "NFSoption (default - nfsvers=4): " nfs_options
-          read -r -p "thresholdCapacity(Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
+          read -r -p "thresholdCapacity (Units can be[Mi/Gi/Ti]) (default - 1000Gi): " thresholdCapacity
 	  read -r -p "Proceed even if resource exists y/n (default - y): " if_resource_exists_still_proceed
 	fi
         if [[ -z "$if_resource_exists_still_proceed" ]];then
@@ -1281,7 +1282,7 @@ EOF
      fi
    fi
    if  [[ -z ${input_config} ]];then
-     read -r -p "whether restore test should also be done?y/n: " restore
+     read -r -p "whether restore test should also be done? y/n: " restore
    fi
    if [[ ${restore} == "Y" ]] || [[ ${restore} == "y" ]] || [[ ${restore} == "True" ]]
    then
