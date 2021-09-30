@@ -913,7 +913,6 @@ create_target()
         if [[ -z "$nfs_options" ]]; then
           nfs_options='nfsvers=4'
         fi
-	set -x
 	echo "Creating target..."
 	cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
