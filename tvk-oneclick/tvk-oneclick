@@ -61,11 +61,14 @@ vercomp () {
     then
         return 0
     fi
-    ret=$(python3 -c "from packaging import version;print(version.parse(\"$1\") < version.parse(\"$2\"))")
-    if [[ $ret == "True" ]];then
+    ret2=$(python3 -c "from packaging import version;print(version.parse(\"$1\") < version.parse(\"$2\"))")
+    ret1=$(python3 -c "from packaging import version;print(version.parse(\"$1\") == version.parse(\"$2\"))")
+    if [[ $ret2 == "True" ]];then
       return 2
-    else
+    elif [[ $ret1 == "True" ]];then
       return 1
+    else
+      return 3
     fi
 
     return 0
@@ -200,12 +203,15 @@ install_tvk()
   fi
   echo "Triliovault operator is running"
   
+  #set value for tvm_name
+  tvm_name="triliovault-manager"
   #check if TVK manager is installed
   if [[ $(kubectl get pods -l app=k8s-triliovault-control-plane -A 2>/dev/null) ]] && [[ $(kubectl get pods -l app=k8s-triliovault-admission-webhook 2>/dev/null) ]];then
     echo "Triliovault manager is already installed"
     if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]];then
       exit 1
     fi
+    tvm_name=$(kubectl get tvm | awk '{print $1}' | sed -n 2p)
     tvk_ns="$get_ns"
     #Check if TVM can be upgraded
     old_tvm_version=$(kubectl get TrilioVaultManager -n "$get_ns" -o json | grep releaseVersion | awk '{print$2}' | sed 's/[a-z-]//g' |  sed -e 's/^"//' -e 's/"$//')
@@ -222,7 +228,9 @@ install_tvk()
     else
       echo "Upgrading triliovault manager.."
       tvm_upgrade=1
-      if [[ $old_tvm_version == 2.1* ]] && [[ $new_triliovault_manager_version == 2.5* ]];
+      vercomp  "$new_triliovault_manager_version" "2.5"
+      ret_val=$?
+      if [[ $ret_val == 2 ]] || [[ $ret_val == 1 ]];
       then
         svc_type=$(kubectl get svc k8s-triliovault-ingress-gateway -o 'jsonpath={.spec.type}')
         if [[ $svc_type == LoadBalancer ]];
@@ -234,7 +242,7 @@ kind: TrilioVaultManager
 metadata:
   labels:
     triliovault: triliovault
-  name: tvm
+  name: ${tvm_name}
   namespace: ${tvk_ns}
 spec:
   trilioVaultAppVersion: ${triliovault_manager_version}
@@ -268,7 +276,7 @@ kind: TrilioVaultManager
 metadata:
   labels:
     triliovault: triliovault
-  name: tvm
+  name: ${tvm_name}
   namespace: ${tvk_ns}
 spec:
   trilioVaultAppVersion: ${triliovault_manager_version}
