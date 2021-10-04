@@ -334,7 +334,7 @@ import sys
 import subprocess
 
 headers = {'Content-type': 'application/x-www-form-urlencoded; charset=utf-8'}
-endpoint="https://doc.trilio.io:5000/8d92edd6-514d-4acd-90f6-694cb8d83336/0061K00000fwkzU"
+endpoint="https://doc.trilio.io:5000/8d92edd6-514d-4acd-90f6-694cb8d83336/0061K00000i9ORf"
 result = subprocess.check_output("kubectl get ns kube-system -o=jsonpath='{.metadata.uid}'", shell=True)
 kubeid = result.decode("utf-8")
 data = "kubescope=clusterscoped&kubeuid={0}".format(kubeid)
@@ -346,8 +346,8 @@ print(soup.body.find('div', attrs={'class':'yaml-content'}).text)
 sys.stdout.close()
 result = subprocess.check_output("kubectl apply -f license_file1.yaml -n $tvk_ns", shell=True)
 EOF
-  sleep 3
-  ret=$(kubectl get license -n "$tvk_ns" 2>> >(logit) | grep -q Activated)
+  sleep 5
+  ret=$(kubectl get license -n "$tvk_ns" 2>> >(logit) | grep -q Active)
   ret_code=$?
   if [ "$ret_code" -ne 0 ];then
     echo "License installation failed"
@@ -642,9 +642,11 @@ create_doks_s3()
   #create bucket
   ret_val=$(s3cmd --config s3cfg_config mb s3://"$bucket_name" 2>> >(logit))
   ret_mgs=$?
+  ret_val_error=$(s3cmd --config s3cfg_config mb s3://"$bucket_name" 2>&1)
   if [[ $ret_mgs -ne 0 ]];then
     ret_code=$(echo "$ret_val" | grep 'Bucket already exists')
-    if [[ "$ret_code" ]]; then
+    ret_code_err=$(echo "$ret_val_error" | grep 'Bucket already exists')
+    if [[ "$ret_code" ]] || [[ $ret_code_err ]]; then
       echo "WARNING: Bucket already exists"
     else
       echo "Error in creating spaces,please check credentials"
@@ -874,9 +876,17 @@ create_target()
         case $vendor_type in
 	  1)
 	    create_doks_s3
+	    ret_code=$?
+	    if [ "$ret_code" -ne 0 ];then
+  	      return 1
+	    fi 
             ;;
           2)
 	    create_aws_s3
+	    ret_code=$?
+            if [ "$ret_code" -ne 0 ];then
+              return 1
+            fi
 	    ;;
 	  *)
             echo "Wrong selection"
@@ -1040,6 +1050,7 @@ EOM
    ret_code=$?
    if [ "$ret_code" -ne 0 ];then
      echo "Cannot write backupplan.yaml file, please check file system permissions"
+     return 1
    fi
    case $backup_way in
       1)
