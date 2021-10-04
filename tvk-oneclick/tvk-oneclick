@@ -334,7 +334,7 @@ import sys
 import subprocess
 
 headers = {'Content-type': 'application/x-www-form-urlencoded; charset=utf-8'}
-endpoint="https://doc.trilio.io:5000/8d92edd6-514d-4acd-90f6-694cb8d83336/0061K00000i9ORf"
+endpoint="https://doc.trilio.io:5000/8d92edd6-514d-4acd-90f6-694cb8d83336/0061K00000fwkzU"
 result = subprocess.check_output("kubectl get ns kube-system -o=jsonpath='{.metadata.uid}'", shell=True)
 kubeid = result.decode("utf-8")
 data = "kubescope=clusterscoped&kubeuid={0}".format(kubeid)
