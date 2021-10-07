@@ -1066,7 +1066,7 @@ EOM
           helm install mysql-qa stable/mysql -n $backup_namespace 1>> >(logit) 2>> >(logit)
           echo "Installing Application"
           cmd="kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running"
-          wait_install 10 "$cmd"
+          wait_install 15 "$cmd"
           if ! kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep -q Running; then
             echo "Application installation failed"
             return 1
@@ -1088,7 +1088,7 @@ EOM
 	  helm repo add bitnami https://charts.bitnami.com/bitnami 1>> >(logit) 2>> >(logit)
           helm install my-wordpress bitnami/wordpress -n $backup_namespace 1>> >(logit) 2>> >(logit)
 	  echo "Installing Application"
-	  runtime=10
+	  runtime=20
           spin='-\|/'
           i=0
           endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
@@ -1117,7 +1117,7 @@ EOM
         fi
         echo "Installing MySQL Operator..."
 	echo "Installing Application"
-        runtime=10
+        runtime=15
         spin='-\|/'
         i=0
         endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
