@@ -138,7 +138,7 @@ Arch:
 	For Operator_based, MySQL operator  would be installed and sample backup/restore will be showcased.
 	For Helm_based, Mongodb  application would be installed and sample backup/restore will be showcased.
 - restore:
-	SPecify whether or not restore should be executed. Allowed values are one from the  [True, False] list.
+	Specify whether or not restore should be executed. Allowed values are one from the  [True, False] list.
 - restore_name:
 	Specify the name for the restore. Default value is 'tvk-restore'.
 - restore_namespace:
