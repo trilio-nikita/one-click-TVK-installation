@@ -694,6 +694,7 @@ call_s3cfg_aws() {
   host_base=$3
   host_bucket=$4
   bucket_location=$5
+  use_https=$6
   cat >s3cfg_config <<-EOM
 [default]
 access_key = ${access_key}
@@ -751,7 +752,7 @@ simpledb_host = sdb.amazonaws.com
 skip_existing = False
 socket_timeout = 300
 urlencoding_mode = normal
-use_https = True
+use_https = ${use_https}
 use_mime_magic = True
 verbosity = WARNING
 website_endpoint = http://%(bucket)s.s3-website-% (location)s.amazonaws.com/
@@ -812,7 +813,7 @@ create_aws_s3() {
   if [[ -z "$bucket_location" ]]; then
     bucket_location="us-east-1"
   fi
-  call_s3cfg_aws "$access_key" "$secret_key" "$host_base" "$host_bucket" "$bucket_location"
+  call_s3cfg_aws "$access_key" "$secret_key" "$host_base" "$host_bucket" "$bucket_location" "True"
   #create bucket
   ret_val=$(s3cmd --config s3cfg_config mb s3://"$bucket_name" 2>&1)
   ret_mgs=$?
@@ -856,11 +857,21 @@ EOF
 create_readymade_minio() {
   if [[ -z ${input_config} ]]; then
     read -r -p "Minio server Namespace (minio): " minio_server_namespace
+    read -r -p "Bucket Name: (tvk-target): " bucket_name
     read -r -p "Target Name (tvk-target): " target_name
     read -r -p "Target Namespace (default): " target_namespace
+    read -r -p "Use existing minio server if available ('Y'): " use_existing_minio
+    read -r -p "Please insert ip address of the machine to be connected : " ip_addr
+  fi
+  if [[ -z "$ip_addr" ]]; then
+   echo "IP address is must to create this target"
+   exit 1
   fi
   if [[ -z "$minio_server_namespace" ]]; then
     minio_server_namespace="minio"
+  fi
+  if [[ -z "$use_existing_minio" ]]; then
+    use_existing_minio="y"
   fi
   if [[ -z "$if_resource_exists_still_proceed" ]]; then
     if_resource_exists_still_proceed='y'
@@ -870,6 +881,9 @@ create_readymade_minio() {
   fi
   if [[ -z "$target_name" ]]; then
     target_name="tvk-target"
+  fi
+  if [[ -z "$bucket_name" ]]; then
+    bucket_name="tvk-target"
   fi
 
   #check if minio_server_namespace already exists
@@ -890,7 +904,7 @@ create_readymade_minio() {
     exit 1
   fi
   #check if minio server already exists 
-  helm show chart minio/minio -n $minio_server_namespace
+  helm show chart minio/minio -n $minio_server_namespace 1>> >(logit) 2>> >(logit)
   retcode=$?
   if  [ "$retcode" -eq 0 ]; then
     echo "minio chart is already installed"
@@ -899,9 +913,8 @@ create_readymade_minio() {
       exit 1
     fi
   fi
-    
   if [[ "$use_existing_minio" != "Y" ]] && [[ "$use_existing_minio" != "y" ]] || [[ "$retcode" -ne 0 ]]; then
-    ret_val = $(helm install --namespace $minio_server_namespace --generate-name  minio/minio 2>> >(logit))
+    ret_val=$(helm install --namespace $minio_server_namespace --generate-name  minio/minio 2>> >(logit))
     retcode=$?
     if [ "$retcode" -ne 0 ]; then
       echo "There is some error in installing minio helm chart, please resolve and try again"
@@ -929,16 +942,70 @@ create_readymade_minio() {
       echo "Not able to execute port forwarding for minio server on port 9000"
       exit 1
     fi
-  elif
+  else
     cmd=$(ps -p $proc_id -o args | grep $pod_name)
     if [[ -z "$cmd" ]]; then
       echo "some other process is running on port 9000, not able to execute port forwarding"
       exit 1
     fi
   fi
-  URL="http://localhost:9000"
-
-}
+  URL="http://$ip_addr:9000"
+  if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>> >(logit)) ]]; then
+    if kubectl get target "$target_name"  -n  "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Unavailable; then
+      echo "Target with same name already exists but is in Unavailable state"
+      return 1
+    else
+      echo "Target with same name already exists"
+      return 0
+    fi
+    if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]]; then
+      exit 1
+    else
+      return 0
+    fi
+  fi
+  #create bucket
+  call_s3cfg_aws "$ACCESS_KEY" "$SECRET_KEY" "$URL" "$URL" "us-east1" "False"
+  #create bucket
+  ret_val=$(s3cmd --config s3cfg_config mb s3://"$bucket_name" 2>&1)
+  ret_mgs=$?
+  if [[ "$ret_mgs" -ne 0 ]]; then
+    ret_code=$(echo "$ret_val" | grep 'BucketAlreadyOwnedByYou')
+    if [[ "$ret_code" ]]; then
+      echo "WARNING: Bucket already exists"
+    else
+      echo "Error in creating bucket,please check credentials"
+      return 1
+    fi
+  fi
+  cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+apiVersion: triliovault.trilio.io/v1
+kind: Target
+metadata:
+  name: $target_name
+  namespace: $target_namespace
+spec:
+  type: ObjectStore
+  vendor: MinIO
+  objectStoreCredentials:
+    url: "$URL"
+    accessKey: "$ACCESS_KEY"
+    secretKey: "$SECRET_KEY"
+    bucketName: "$bucket_name"
+    region: "us-east1"
+  thresholdCapacity: 100Gi
+EOF
+  retcode=$?
+  if [ "$retcode" -ne 0 ]; then
+    echo "Target creation failed"
+    return 1
+  fi
+  #Make changes in config file
+  #if [[ -n ${input_config} ]]; then   
+  #  sed -c -i "s/\($access_key *= *\).*/\1$ACCESS_KEY/" ${input_config}
+  #  sed -c -i "s/\($secret_key *= *\).*/\1$SECRET_KEY/" ${input_config}
+  #fi
+} 
 
 
 #This module is used to create target to be used for TVK backup and restore
