@@ -851,6 +851,8 @@ EOF
   fi
 }
 
+}
+
 call_s3cfg_aws() {
   access_key=$1
   secret_key=$2
