@@ -24,9 +24,9 @@ preflight_checks() {
       ret=$?
       if [ "$ret" -ne 0 ]; then
         echo "Failed to uggrade tvk-plugins/tvk-preflight plugin"
-	return 1
+        return 1
       else
-	echo "tvk-preflight is already the newest version"
+        echo "tvk-preflight is already the newest version"
       fi
     fi
   else
@@ -306,11 +306,11 @@ spec:
         type: LoadBalancer
       host: "${get_host}"
 EOF
-  retcode=$?
-  if [ "$retcode" -ne 0 ]; then
-    echo "There is error in installingi/upgrading triliovault manager,please resolve and try again" 2>> >(logit)
-    return 1
-  fi
+    retcode=$?
+    if [ "$retcode" -ne 0 ]; then
+      echo "There is error in installingi/upgrading triliovault manager,please resolve and try again" 2>> >(logit)
+      return 1
+    fi
   else
     cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
@@ -609,7 +609,7 @@ EOF
 }
 
 create_secret() {
-  secret_nam=$1
+  secret_name=$1
   access_key=$2
   secret_key=$3
   cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
@@ -638,22 +638,22 @@ check_target_existence() {
   bucket_name=$6
   region=$7
   if [[ $(kubectl get target "$target_name" -n "$target_namespace" 2>> >(logit)) ]]; then
-    if kubectl get target "$target_name"  -n  "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Unavailable; then
+    if kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Unavailable; then
       echo "Target with same name already exists but is in Unavailable state"
       return 1
     else
-      secret_name=$(kubectl get target $target_name -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.credentialSecret.name}')
+      secret_name=$(kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.credentialSecret.name}')
       if [[ $secret_name == "" ]]; then
-        old_access=$(kubectl get target $target_name -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.accessKey}')
-        old_secret=$(kubectl get target $target_name -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.secretKey}')
+        old_access=$(kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.accessKey}')
+        old_secret=$(kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.secretKey}')
       else
-        secret_namespace=$(kubectl get target $target_name -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.credentialSecret.namespace}')
-        old_access=$(kubectl get secret $secret_name -n $secret_namespace -o 'jsonpath={.data.accessKey}' | base64 -d)
-        old_secret=$(kubectl get secret $secret_name -n $secret_namespace -o 'jsonpath={.data.secretKey}' | base64 -d)
+        secret_namespace=$(kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.credentialSecret.namespace}')
+        old_access=$(kubectl get secret "$secret_name" -n "$secret_namespace" -o 'jsonpath={.data.accessKey}' | base64 -d)
+        old_secret=$(kubectl get secret "$secret_name" -n "$secret_namespace" -o 'jsonpath={.data.secretKey}' | base64 -d)
       fi
-      old_url=$(kubectl get target $target_name -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.url}')
-      old_bucket=$(kubectl get target $target_name -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.bucketName}')
-      old_region=$(kubectl get target $target_name -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.region}')
+      old_url=$(kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.url}')
+      old_bucket=$(kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.bucketName}')
+      old_region=$(kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.spec.objectStoreCredentials.region}')
       flag=0
       new_str="Target with same name already exists"
       [[ "$old_access" != "$access_key" ]] && new_str="$new_str with different access key"
@@ -670,7 +670,7 @@ check_target_existence() {
     fi
   fi
   return 0
- }
+}
 
 call_s3cfg_doks() {
   access_key=$1
@@ -1059,11 +1059,11 @@ create_readymade_minio() {
   fi
   #check if minio server already exists
   helm show chart minio/minio -n $minio_server_namespace 1>> >(logit) 2>> >(logit)
-  rel_name=$(helm list -n $minio_server_namespace | awk '$9 ~ "^minio" { print $0 }' | sed -n '1p'| awk '{print $1}')
-  if  [[ "$rel_name" != "" ]]; then
+  rel_name=$(helm list -n $minio_server_namespace | awk '$9 ~ "^minio" { print $0 }' | sed -n '1p' | awk '{print $1}')
+  if [[ "$rel_name" != "" ]]; then
     echo "minio is already installed"
     #rel_name=$(helm list -n $minio_server_namespace | awk '$9 ~ "^minio" { print $0 }' | sed -n '1p'| awk '{print $1}')
-    pod_name=$(kubectl get pod -n $minio_server_namespace | grep $rel_name | awk '{print $1}')
+    #pod_name=$(kubectl get pod -n $minio_server_namespace | grep "$rel_name" | awk '{print $1}')
     if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]]; then
       exit 1
     fi
@@ -1075,13 +1075,13 @@ create_readymade_minio() {
     fi
   fi
   if [[ "$use_existing_minio" != "Y" ]] && [[ "$use_existing_minio" != "y" ]] || [[ "$rel_name" == "" ]]; then
-    ret_val=$(helm install --namespace $minio_server_namespace --generate-name  minio/minio 2>> >(logit))
+    ret_val=$(helm install --namespace $minio_server_namespace --generate-name minio/minio 2>> >(logit))
     retcode=$?
     if [ "$retcode" -ne 0 ]; then
       echo "There is some error in installing minio helm chart, please resolve and try again"
       exit 1
     fi
-    rel_name=$(echo $ret_val | awk '{print $2}')
+    rel_name=$(echo "$ret_val" | awk '{print $2}')
   else
     if [[ -z ${input_config} ]]; then
       read -r -p "you any available minio server (y/n) ('Y') : " default_minio
@@ -1090,19 +1090,19 @@ create_readymade_minio() {
       default_minio="y"
     fi
     if [[ "$default_minio" != "Y" ]] && [[ "$default_minio" != "y" ]]; then
-      read -r -p "Enter the service name of the existing minio: " pod_name
+      #read -r -p "Enter the service name of the existing minio: " pod_name
       read -r -p "Enter the namespace in which th minio pod resides: " minio_server_namespace
       read -r -p "Enter the secret name for the existing minio server: " rel_name
     else
       i=1
-      minio_num=$(helm list -n $minio_server_namespace | awk '$9 ~ "^minio" { print $0 }' | wc -l)
-      while [ $minio_num -ge $i ]; do
-        rel_name=$(helm list -n $minio_server_namespace | awk '$9 ~ "^minio" { print $0 }' |  sed -n $i'p' | awk '{print $1}')
-        if ! kubectl get deployment $rel_name -n $minio_server_namespace -o jsonpath="{.status.conditions[*].status}" | grep -q false; then
+      minio_num=$(helm list -n "$minio_server_namespace" | awk '$9 ~ "^minio" { print $0 }' | wc -l)
+      while [ "$minio_num" -ge $i ]; do
+        rel_name=$(helm list -n "$minio_server_namespace" | awk '$9 ~ "^minio" { print $0 }' | sed -n $i'p' | awk '{print $1}')
+        if ! kubectl get deployment "$rel_name" -n "$minio_server_namespace" -o jsonpath="{.status.conditions[*].status}" | grep -q false; then
           break
         fi
         rel_name=""
-        i=$((i+1))
+        i=$((i + 1))
       done
     fi
     if [[ "$rel_name" == "" ]]; then
@@ -1112,16 +1112,16 @@ create_readymade_minio() {
   fi
   #Check if minio is deployed correctly
   #rel_name=$(echo $ret_val | awk '{print $2}')
-  pod_name=$(kubectl get pod -n $minio_server_namespace | grep $rel_name | awk '{print $1}')
+  #pod_name=$(kubectl get pod -n "$minio_server_namespace" | grep $rel_name | awk '{print $1}')
   cmd="kubectl get deployment $rel_name -n $minio_server_namespace -o 'jsonpath={.status.conditions[*].status}' | grep -v False"
   wait_install 10 "$cmd"
-  if ! kubectl get deployment $rel_name -n $minio_server_namespace -o jsonpath="{.status.conditions[*].status}" | grep -q True; then
+  if ! kubectl get deployment $rel_name -n "$minio_server_namespace" -o jsonpath="{.status.conditions[*].status}" | grep -q True; then
     echo "Minio deployment taking more time than usual to be in Ready state, Exiting.."
     return 1
   fi
   #get credentials and create target crd and apply it.
-  ACCESS_KEY=$(kubectl get secret $rel_name -n $minio_server_namespace -o jsonpath="{.data.accesskey}" | base64 --decode)
-  SECRET_KEY=$(kubectl get secret $rel_name -n $minio_server_namespace -o jsonpath="{.data.secretkey}" | base64 --decode)
+  ACCESS_KEY=$(kubectl get secret $rel_name -n "$minio_server_namespace" -o jsonpath="{.data.accesskey}" | base64 --decode)
+  SECRET_KEY=$(kubectl get secret $rel_name -n "$minio_server_namespace" -o jsonpath="{.data.secretkey}" | base64 --decode)
   URL="http://$rel_name.$minio_server_namespace.svc:9000"
   check_target_existence "$target_name" "$target_namespace" "$ACCESS_KEY" "$SECRET_KEY" "$URL" "$bucket_name" "us-east1"
   ret_code=$?
@@ -1131,7 +1131,7 @@ create_readymade_minio() {
   #create pod to run minio clinet command
   rand_name=$(head /dev/urandom | tr -dc a-z0-9 | head -c5)
   mc_pod_nm="minio-$rand_name"
-  ret_val=$(kubectl run $mc_pod_nm --image=minio/mc --restart=Never --command --  /bin/sh -c 'while true; do sleep 5s; done' 1>> >(logit) 2>> >(logit))
+  ret_val=$(kubectl run "$mc_pod_nm" --image=minio/mc --restart=Never --command -- /bin/sh -c 'while true; do sleep 5s; done' 1>> >(logit) 2>> >(logit))
   ret_code=$?
   if [[ "$ret_code" -ne 0 ]]; then
     echo "not able to run minio cclinet image/container"
@@ -1139,12 +1139,12 @@ create_readymade_minio() {
   fi
   cmd="kubectl get pod $mc_pod_nm -o jsonpath='{.status.phase}' 2>/dev/null | grep -e Running"
   wait_install 10 "$cmd"
-  if ! kubectl get pod $mc_pod_nm -o jsonpath="{.status.phase}" | grep -q Running; then
+  if ! kubectl get pod "$mc_pod_nm" -o jsonpath="{.status.phase}" | grep -q Running; then
     echo "Minio client container taking more time than usual to be in Ready state, Exiting.."
     return 1
   fi
-  ret_val=$(kubectl exec -it $mc_pod_nm -- mc alias set minio $url $access_key $secret_key 2>> >(logit))
-  ret_msg=$(kubectl exec -it $mc_pod_nm -- mc mb minio/$bucket_name)
+  ret_val=$(kubectl exec -it "$mc_pod_nm" -- mc alias set minio $url "$access_key" "$secret_key" 2>> >(logit))
+  ret_msg=$(kubectl exec -it "$mc_pod_nm" -- mc mb minio/$bucket_name)
   #create bucket
   #ret_val=$(s3cmd --config s3cfg_config mb s3://"$bucket_name" 2>&1)
   ret_code=$?
@@ -1157,7 +1157,7 @@ create_readymade_minio() {
       return 1
     fi
   fi
-  kubectl delete pod $mc_pod_nm 1>> >(logit) 2>> >(logit)
+  kubectl delete pod "$mc_pod_nm" 1>> >(logit) 2>> >(logit)
   #echo "$ACCESS_KEY $SECRET_KEY  $URL"
   #create bucket
   #call_s3cfg_aws "$ACCESS_KEY" "$SECRET_KEY" "$URL" "$URL" "us-east1" "False"
@@ -1194,7 +1194,7 @@ EOF
     echo "Target creation failed"
     return 1
   fi
-    cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+  cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: Target
 metadata:
@@ -1219,8 +1219,8 @@ EOF
   fi
   #Make changes in config file
   if [[ -n ${input_config} ]]; then
-    sed -c -i "s/\($access_key *= *\).*/\1$ACCESS_KEY/" ${input_config}
-    sed -c -i "s/\($secret_key *= *\).*/\1$SECRET_KEY/" ${input_config}
+    sed -c -i "s/\($access_key *= *\).*/\1$ACCESS_KEY/" "${input_config}"
+    sed -c -i "s/\($secret_key *= *\).*/\1$SECRET_KEY/" "${input_config}"
   fi
 }
 
@@ -1377,19 +1377,19 @@ create_target() {
       fi
       ;;
     3)
-     create_readymade_minio
-     ret_code=$?
-     if [ "$ret_code" -ne 0 ]; then
-       return 1
-     fi
-     ;;
-    4)
-     create_gcp_s3
-     ret_code=$?
-     if [ "$ret_code" -ne 0 ]; then
+      create_readymade_minio
+      ret_code=$?
+      if [ "$ret_code" -ne 0 ]; then
         return 1
-     fi
-     ;;
+      fi
+      ;;
+    4)
+      create_gcp_s3
+      ret_code=$?
+      if [ "$ret_code" -ne 0 ]; then
+        return 1
+      fi
+      ;;
     *)
       echo "Wrong selection"
       return 1
