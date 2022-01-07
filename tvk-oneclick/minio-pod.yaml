@@ -1,0 +1,166 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    checksum/config: 76b8c360e58b06322236b79eb135fca380cb864558dbb1fb9ae781ea00a806ec
+    checksum/secrets: 469a7a15c1b592b37f18f0dee5f8f5c049ea95d7cccc10b0a14373d905db6161
+    k8s.v1.cni.cncf.io/network-status: |-
+      [{
+          "name": "",
+          "interface": "eth0",
+          "ips": [
+              "10.128.3.101"
+          ],
+          "default": true,
+          "dns": {}
+      }]
+    k8s.v1.cni.cncf.io/networks-status: |-
+      [{
+          "name": "",
+          "interface": "eth0",
+          "ips": [
+              "10.128.3.101"
+          ],
+          "default": true,
+          "dns": {}
+      }]
+    openshift.io/scc: minio-1639552971
+  creationTimestamp: "2021-12-15T07:22:57Z"
+  generateName: minio-1639552971-5446bd9767-
+  labels:
+    app: minio
+    pod-template-hash: 5446bd9767
+    release: minio-1639552971
+  name: minio-1639552971-5446bd9767-gwc57
+  namespace: minio
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: minio-1639552971-5446bd9767
+    uid: 76a4924f-c715-428d-8e80-d3414744f0a1
+  resourceVersion: "13189398"
+  selfLink: /api/v1/namespaces/minio/pods/minio-1639552971-5446bd9767-gwc57
+  uid: 1cf95537-8cd2-45a7-b19f-cea0a15c896d
+spec:
+  containers:
+  - command:
+    - /bin/sh
+    - -ce
+    - /usr/bin/docker-entrypoint.sh minio -S /etc/minio/certs/ server /export
+    env:
+    - name: MINIO_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          key: accesskey
+          name: minio-1639552971
+    - name: MINIO_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          key: secretkey
+          name: minio-1639552971
+    image: minio/minio:RELEASE.2021-02-14T04-01-33Z
+    imagePullPolicy: IfNotPresent
+    name: minio
+    ports:
+    - containerPort: 9000
+      name: http
+      protocol: TCP
+    resources:
+      requests:
+        memory: 4Gi
+    securityContext:
+      capabilities:
+        drop:
+        - KILL
+        - MKNOD
+        - SETGID
+        - SETUID
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /export
+      name: export
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: minio-1639552971-token-ct9fs
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  imagePullSecrets:
+  - name: minio-1639552971-dockercfg-brvf9
+  nodeName: etcd-backup-restore-jp72t-worker-a-hmn4c
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext:
+    fsGroup: 1000
+    runAsGroup: 1000
+    runAsUser: 1000
+    seLinuxOptions:
+      level: s0:c26,c5
+  serviceAccount: minio-1639552971
+  serviceAccountName: minio-1639552971
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoSchedule
+    key: node.kubernetes.io/memory-pressure
+    operator: Exists
+  volumes:
+  - name: export
+    persistentVolumeClaim:
+      claimName: minio-1639552971
+  - name: minio-user
+    secret:
+      defaultMode: 420
+      secretName: minio-1639552971
+  - name: minio-1639552971-token-ct9fs
+    secret:
+      defaultMode: 420
+      secretName: minio-1639552971-token-ct9fs
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2021-12-15T07:23:02Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2021-12-15T07:23:24Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2021-12-15T07:23:24Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2021-12-15T07:23:02Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: cri-o://06b73d4788a4b3ab3ec9f4ac5bd2deca830b38a25eb59ffb16b848d5b9f7d323
+    image: docker.io/minio/minio:RELEASE.2021-02-14T04-01-33Z
+    imageID: docker.io/minio/minio@sha256:21e899c3e4db21866cc916e6e333faf045eb20b1a8cccf5b7e677f2ab0022438
+    lastState: {}
+    name: minio
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2021-12-15T07:23:23Z"
+  hostIP: 10.0.32.3
+  phase: Running
+  podIP: 10.128.3.101
+  podIPs:
+  - ip: 10.128.3.101
+  qosClass: Burstable
+  startTime: "2021-12-15T07:23:02Z"

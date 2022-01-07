@@ -1,0 +1,10 @@
+apiVersion: triliovault.trilio.io/v1
+kind: BackupPlan
+metadata:
+  name: ns-backupplan-1
+  namespace: etcd-manual
+spec:
+  backupConfig:
+    target:
+      namespace: default
+      name: demo-s3-target1

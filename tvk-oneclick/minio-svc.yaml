@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: minio-1639552971
+    meta.helm.sh/release-namespace: minio
+  creationTimestamp: "2021-12-15T07:22:56Z"
+  labels:
+    app: minio
+    app.kubernetes.io/managed-by: Helm
+    chart: minio-8.0.10
+    heritage: Helm
+    release: minio-1639552971
+  name: minio-1639552971
+  namespace: minio
+  resourceVersion: "15207714"
+  selfLink: /api/v1/namespaces/minio/services/minio-1639552971
+  uid: ad29d1dd-9579-4781-a990-3df8be5ce3a1
+spec:
+  clusterIP: 172.30.221.91
+  ports:
+  - name: http
+    port: 9000
+    protocol: TCP
+    targetPort: 9000
+  selector:
+    app: minio
+    release: minio-1639552971
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

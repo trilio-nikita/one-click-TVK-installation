@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: minio-mc
+spec:
+  containers:
+  - image: bitnami/minio-client:latest
+    name: minio-client
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "mc alias set minio minio-1639993582.minio.svc.cluster.local JgwZkbyN1QQkvCoOsGjv Dkjkuua89DC0n9jANa5GYhsGKaGcESZjr9G2HXf2;mc mb tvk-target123" ]

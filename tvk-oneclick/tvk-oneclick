@@ -153,6 +153,7 @@ install_tvk() {
       echo "There is some error in helm install triliovaul operator,please resolve and try again" 2>> >(logit)
       return 1
     fi
+    get_ns=$(kubectl get deployments -l "release=triliovault-operator" -A 2>> >(logit) | awk '{print $1}' | sed -n 2p)
   else
     tvk_ns="$get_ns"
     echo "Triliovault operator is already installed!"
@@ -207,12 +208,11 @@ install_tvk() {
     return 1
   fi
   echo "Triliovault operator is running"
-
   #set value for tvm_name
   tvm_name="triliovault-manager"
   #check if TVK manager is installed
   ret_code=$(kubectl get tvm -A 2>/dev/null)
-  if [[ ! -z "$ret_code" ]]; then
+  if [[ -n "$ret_code" ]]; then
     echo "Triliovault manager is already installed"
     if [[ "$if_resource_exists_still_proceed" != "Y" ]] && [[ "$if_resource_exists_still_proceed" != "y" ]]; then
       exit 1
@@ -233,14 +233,18 @@ install_tvk() {
       install_license "$tvk_ns"
       return
     else
-      echo "Upgrading triliovault manager.."
+      echo "checking if triliovault manager can be upgraded"
       tvm_upgrade=1
       vercomp "2.5" "$new_triliovault_manager_version"
       ret_val=$?
-      if [[ $ret_val == 2 ]] || [[ $ret_val == 1 ]]; then
+      vercomp "2.6" "$new_triliovault_manager_version"
+      ret_val1=$?
+      vercomp "$old_tvm_version" "2.5"
+      ret_val2=$?
+      if [[ $ret_val == 2 ]] || [[ $ret_val == 1 ]] && [[ $ret_val1 == 3 ]] && [[ $ret_val2 == 2 ]] || [[ $ret_val2 == 1 ]]; then
         svc_type=$(kubectl get svc "$ingressGateway" -n "$get_ns" -o 'jsonpath={.spec.type}')
         if [[ $svc_type == LoadBalancer ]]; then
-          get_host=$(kubectl get ingress "$masterIngName" -n "$get_ns" -o 'jsonpath={.spec.rules[0].host}')
+          get_host=$(kubectl get ingress k8s-triliovault-ingress-master -n "$get_ns" -o 'jsonpath={.spec.rules[0].host}')
           cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: TrilioVaultManager
@@ -263,23 +267,108 @@ EOF
           retcode=$?
           if [ "$retcode" -ne 0 ]; then
             echo "There is error upgrading triliovault manager,please resolve and try again" 2>> >(logit)
+            return 1
           else
-            echo "Triliovault manager upgraded successfully"
+            echo "Upgrading Triliovault manager"
           fi
+        fi
+      elif [[ $ret_val1 == 2 ]] || [[ $ret_val1 == 1 ]] && [[ $ret_val2 == 2 ]] || [[ $ret_val2 == 1 ]]; then
+        svc_type=$(kubectl get svc "$ingressGateway" -n "$get_ns" -o 'jsonpath={.spec.type}')
+        if [[ $svc_type == LoadBalancer ]]; then
+          get_host=$(kubectl get ingress k8s-triliovault-ingress-master -n "$get_ns" -o 'jsonpath={.spec.rules[0].host}')
+          cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+apiVersion: triliovault.trilio.io/v1
+kind: TrilioVaultManager
+metadata:
+  labels:
+    triliovault: triliovault
+  name: ${tvm_name}
+  namespace: ${tvk_ns}
+spec:
+  trilioVaultAppVersion: ${triliovault_manager_version}
+  ingressConfig:
+    host: "${get_host}"
+  # TVK components configuration, currently supports control-plane, web, exporter, web-backend, ingress-controller, admission-webhook.
+  # User can configure resources for all componentes and can configure service type and host for the ingress-controller
+  componentConfiguration:
+    ingress-controller:
+      service:
+        type: LoadBalancer
+  applicationScope: Cluster
+EOF
+          retcode=$?
+          if [ "$retcode" -ne 0 ]; then
+            echo "There is error upgrading triliovault manager,please resolve and try again" 2>> >(logit)
+            return 0
+          else
+            echo "Upgrading Triliovault manager"
+          fi
+        fi
+      elif [[ $ret_val1 == 2 ]] || [[ $ret_val1 == 1 ]]; then
+        svc_type=$(kubectl get svc "$ingressGateway" -n "$get_ns" -o 'jsonpath={.spec.type}')
+        if [[ $svc_type == LoadBalancer ]]; then
+          get_host=$(kubectl get ingress "$masterIngName" -n "$get_ns" -o 'jsonpath={.spec.rules[0].host}')
+          cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+apiVersion: triliovault.trilio.io/v1
+kind: TrilioVaultManager
+metadata:
+  labels:
+    triliovault: triliovault
+  name: ${tvm_name}
+  namespace: ${tvk_ns}
+spec:
+  trilioVaultAppVersion: ${triliovault_manager_version}
+  ingressConfig:
+    host: "${get_host}"
+  # TVK components configuration, currently supports control-plane, web, exporter, web-backend, ingress-controller, admission-webhook.
+  # User can configure resources for all componentes and can configure service type and host for the ingress-controller
+  componentConfiguration:
+    ingress-controller:
+      service:
+        type: LoadBalancer
+  applicationScope: Cluster
+EOF
+        elif [[ $svc_type == NodePort ]]; then
+          get_host=$(kubectl get ingress "$masterIngName" -n "$get_ns" -o 'jsonpath={.spec.rules[0].host}')
+          cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+apiVersion: triliovault.trilio.io/v1
+kind: TrilioVaultManager
+metadata:
+  labels:
+    triliovault: triliovault
+  name: ${tvm_name}
+  namespace: ${tvk_ns}
+spec:
+  trilioVaultAppVersion: ${triliovault_manager_version}
+  ingressConfig:
+    host: "${get_host}"
+  # TVK components configuration, currently supports control-plane, web, exporter, web-backend, ingress-controller, admission-webhook.
+  # User can configure resources for all componentes and can configure service type and host for the ingress-controller
+  componentConfiguration:
+    ingress-controller:
+      service:
+        type: NodePort
+  applicationScope: Cluster
+EOF
+        fi
+
+        retcode=$?
+        if [ "$retcode" -ne 0 ]; then
+          echo "There is error upgrading triliovault manager,please resolve and try again" 2>> >(logit)
           return 1
+        else
+          echo "Upgrading Triliovault manager"
         fi
       fi
     fi
+  else
+    # Create TrilioVaultManager CR
+    sleep 10
+    vercomp "2.6" "$new_triliovault_manager_version"
+    ret_val=$?
+    if [[ $ret_val == 2 ]] || [[ $ret_val == 1 ]] && [[ $tvm_upgrade != 1 ]]; then
 
-  fi
-
-  # Create TrilioVaultManager CR
-  sleep 10
-  vercomp "2.6" "$new_triliovault_manager_version"
-  ret_val=$?
-  if [[ $ret_val == 2 ]] || [[ $ret_val == 1 ]] && [[ $tvm_upgrade != 1 ]]; then
-
-    cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+      cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: TrilioVaultManager
 metadata:
@@ -304,15 +393,15 @@ spec:
     ingress-controller:
       service:
         type: LoadBalancer
-      host: "${get_host}"
+      host: "trilio.co.us"
 EOF
-    retcode=$?
-    if [ "$retcode" -ne 0 ]; then
-      echo "There is error in installingi/upgrading triliovault manager,please resolve and try again" 2>> >(logit)
-      return 1
-    fi
-  else
-    cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
+      retcode=$?
+      if [ "$retcode" -ne 0 ]; then
+        echo "There is error in installingi/upgrading triliovault manager,please resolve and try again" 2>> >(logit)
+        return 1
+      fi
+    else
+      cat <<EOF | kubectl apply -f - 1>> >(logit) 2>> >(logit)
 apiVersion: triliovault.trilio.io/v1
 kind: TrilioVaultManager
 metadata:
@@ -326,10 +415,16 @@ spec:
     version: v3
   applicationScope: Cluster
 EOF
+      retcode=$?
+      if [ "$retcode" -ne 0 ]; then
+        echo "There is error in installingi/upgrading triliovault manager,please resolve and try again" 2>> >(logit)
+        return 1
+      fi
+    fi
   fi
-  sleep 2
+  sleep 5
   if [[ $tvm_upgrade == 1 ]]; then
-    echo "Upgrading Triliovault manager..."
+    echo "Waiting for Pods to come up.."
   else
     echo "Installing Triliovault manager...."
   fi
@@ -352,6 +447,7 @@ EOF
   fi
   install_license "$tvk_ns"
 }
+
 
 #This module is use to install license
 install_license() {
@@ -1081,7 +1177,7 @@ create_readymade_minio() {
       echo "There is some error in installing minio helm chart, please resolve and try again"
       exit 1
     fi
-    rel_name=$(echo "$ret_val" | awk '{print $2}')
+    rel_name=$(echo $ret_val | awk '{print $2}')
   else
     if [[ -z ${input_config} ]]; then
       read -r -p "you any available minio server (y/n) ('Y') : " default_minio
@@ -1113,6 +1209,7 @@ create_readymade_minio() {
   #Check if minio is deployed correctly
   #rel_name=$(echo $ret_val | awk '{print $2}')
   #pod_name=$(kubectl get pod -n "$minio_server_namespace" | grep $rel_name | awk '{print $1}')
+  echo "Waiting for Minio deployment to be in Ready state.."
   cmd="kubectl get deployment $rel_name -n $minio_server_namespace -o 'jsonpath={.status.conditions[*].status}' | grep -v False"
   wait_install 10 "$cmd"
   if ! kubectl get deployment $rel_name -n "$minio_server_namespace" -o jsonpath="{.status.conditions[*].status}" | grep -q True; then
@@ -1137,6 +1234,7 @@ create_readymade_minio() {
     echo "not able to run minio cclinet image/container"
     return 1
   fi
+  echo "Waiting for minio client pod to be in Ready state.."
   cmd="kubectl get pod $mc_pod_nm -o jsonpath='{.status.phase}' 2>/dev/null | grep -e Running"
   wait_install 10 "$cmd"
   if ! kubectl get pod "$mc_pod_nm" -o jsonpath="{.status.phase}" | grep -q Running; then
@@ -1457,6 +1555,7 @@ EOF
     ;;
   esac
   shift
+  echo "Creating Target.."
   cmd="kubectl get target $target_name -n $target_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Unavailable"
   wait_install 20 "$cmd"
   if ! kubectl get target "$target_name" -n "$target_namespace" -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Available; then
@@ -1519,6 +1618,13 @@ sample_test() {
       return 1
     fi
   fi
+  #Check if cluster is OCP
+  ret_resp=$(kubectl get crd openshiftcontrollermanagers.operator.openshift.io 1>> >(logit) 2>> >(logit))
+  ret_val=$?
+  open_flag=0
+  if [ "$ret_code" -eq 0 ]; then
+    open_flag=1
+  fi  
   if [[ -z $backup_way ]]; then
     echo "Please provide valid backup-way..exiting.."
     return 1
@@ -1566,6 +1672,10 @@ EOM
         exit 1
       fi
       echo "Waiting for application to be in Ready state"
+      if [ "$open_flag" -eq 1 ]; then
+        kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-scc-to-user anyuid -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+        kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-cluster-role-to-user cluster-admin  -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+      fi
       cmd="kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running"
       wait_install 15 "$cmd"
       if ! kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep -q Running; then
@@ -1575,6 +1685,11 @@ EOM
     else
       helm install mysql-qa stable/mysql -n $backup_namespace 1>> >(logit) 2>> >(logit)
       echo "Installing Application"
+      cmd=$(kubectl get pods -l app=mysql-qa -n $backup_namespace 2>&1)
+      if [[ $cmd == "No resources found in $backup_namespace namespace." ]];then
+        echo "Error in creating pod, please check security context"
+	return 1
+      fi
       cmd="kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep Running"
       wait_install 15 "$cmd"
       if ! kubectl get pods -l app=mysql-qa -n $backup_namespace 2>/dev/null | grep -q Running; then
@@ -1599,9 +1714,19 @@ EOM
       helm install my-wordpress bitnami/wordpress -n $backup_namespace 1>> >(logit) 2>> >(logit)
       echo "Installing Application"
     fi
+    if [ "$open_flag" -eq 1 ]; then
+      kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-scc-to-user anyuid -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+      kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-cluster-role-to-user cluster-admin  -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+    fi
     runtime=20
     spin='-\|/'
     i=0
+    sleep 5
+    cmd=$(kubectl get pod -l app.kubernetes.io/instance=my-wordpress -n $backup_namespace 2>&1)
+    if [[ $cmd == "No resources found in $backup_namespace namespace." ]];then
+      echo "Error in creating pod, please check security context"
+      return 1
+    fi
     endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
     while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pod -l app.kubernetes.io/instance=my-wordpress -n $backup_namespace -o jsonpath="{.items[*].status.conditions[*].status}" | grep -q False; do
       i=$(((i + 1) % 4))
@@ -1632,9 +1757,19 @@ EOM
       fi
       echo "Installing MySQL Operator..."
     fi
+    if [ "$open_flag" -eq 1 ]; then
+      kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-scc-to-user anyuid -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+      kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-cluster-role-to-user cluster-admin  -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+    fi
     runtime=15
     spin='-\|/'
     i=0
+    sleep 5
+    cmd=$(kubectl get pod -l app=mysql-operator -n $backup_namespace 2>&1)
+    if [[ $cmd == "No resources found in $backup_namespace namespace." ]];then
+      echo "Error in creating pod, please check security context"
+      return 1
+    fi
     endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
     while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pod -l app=mysql-operator -n $backup_namespace -o jsonpath="{.items[*].status.conditions[*].status}" | grep -q False; do
       i=$(((i + 1) % 4))
@@ -1655,11 +1790,21 @@ EOM
       echo "Installing MySQL cluster..."
       sleep 10
     fi
+    if [ "$open_flag" -eq 1 ]; then
+      kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-scc-to-user anyuid -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+      kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-cluster-role-to-user cluster-admin  -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+    fi
     runtime=15
     spin='-\|/'
     i=0
+    sleep 5
+    cmd=$(kubectl get pod -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace 2>&1)
+    if [[ $cmd == "No resources found in $backup_namespace namespace." ]];then
+      echo "Error in creating pod, please check security context"
+      return 1
+    fi
     endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
-    while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace -o jsonpath="{.items[*].status.conditions[*].status}" | grep -q False; do
+    while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pods -l mysql.presslabs.org/cluster=my-cluster -n $backup_namespace -o jsonpath="{.items[*].status.conditions[*].status}" | grep -q False; do 
       i=$(((i + 1) % 4))
       printf "\r %s" "${spin:$i:1}"
       sleep .1
@@ -1702,9 +1847,19 @@ EOM
       } 2>> >(logit)
       echo "Installing App..."
     fi
+    if [ "$open_flag" -eq 1 ]; then
+      kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-scc-to-user anyuid -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+      kubectl get sa -n $backup_namespace | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-cluster-role-to-user cluster-admin  -z '{}' -n $backup_namespace 1>> >(logit) 2>> >(logit)
+    fi
     runtime=15
     spin='-\|/'
     i=0
+    sleep 5
+    cmd=$(kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace 2>&1)
+    if [[ $cmd == "No resources found in $backup_namespace namespace." ]];then
+      echo "Error in creating pod, please check security context"
+      return 1
+    fi
     endtime=$(python3 -c "import time;timeout = int(time.time()) + 60*$runtime;print(\"{0}\".format(timeout))")
     while [[ $(python3 -c "import time;timeout = int(time.time());print(\"{0}\".format(timeout))") -le $endtime ]] && kubectl get pod -l app.kubernetes.io/name=mongodb -n $backup_namespace -o jsonpath="{.items[*].status.conditions[*].status}" | grep -q -w False; do
       i=$(((i + 1) % 4))
@@ -1763,6 +1918,7 @@ EOF
       return 1
     fi
   fi
+  echo "Waiting for backupplan to be Available to use.."
   cmd="kubectl get backupplan $bk_plan_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Unavailable"
   wait_install 10 "$cmd"
   if ! kubectl get backupplan $bk_plan_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -q Available; then
@@ -1799,6 +1955,7 @@ EOF
       return 1
     fi
   fi
+  echo "Waiting for backup to be available.."
   cmd="kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Available -e Failed"
   wait_install 60 "$cmd"
   if ! kubectl get backup $backup_name -n $backup_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -wq Available; then
@@ -1864,6 +2021,7 @@ EOF
         return 1
       fi
     fi
+    echo "Waiting for restore to complete.."
     cmd="kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -e Completed -e Failed"
     wait_install 60 "$cmd"
     if ! kubectl get restore $restore_name -n $restore_namespace -o 'jsonpath={.status.status}' 2>/dev/null | grep -wq 'Completed'; then
