@@ -6,7 +6,7 @@ if_resource_exists_still_proceed='y'
 #[Preflight check parameters]
 
 #Whether or not preflight should be executed [True, False]
-PREFLIGHT=False
+PREFLIGHT=True
 
 #Whenthet plugin should proceed even if preflight checks fail.Allowedvalues=[Y,y,n,N]
 proceed_even_PREFLIGHT_fail='Y'
@@ -17,13 +17,13 @@ storage_class=
 #[TVK installation parameters]
 
 #Whether or not TVK should be installed [True, False]
-TVK_INSTALL=False
+TVK_INSTALL=True
 
 #Specify TVK operator version
-operator_version='2.6.6'
+operator_version='2.6.7'
 
 #Specify TVK Manager version
-triliovault_manager_version='2.6.6'
+triliovault_manager_version='2.6.7'
 
 #Specify namespace name in which TVK should get installed.
 tvk_ns='tvk'
@@ -31,30 +31,31 @@ tvk_ns='tvk'
 #[UI configurations parameters]
 
 #Whether or not TVK UI should be configured [True, False]
-CONFIGURE_UI=False
+CONFIGURE_UI=True
 
 #Specify the way in which TVK UI should be configured['Loadbalancer','Nodeport','PortForwarding']
 ui_access_type='Loadbalancer'
 
-#Specify the domain name, this should be present or added in DNS server
-domain='domainname'
+#Specify the domain name, this should be present or added in DNS server(specific for DigitalOcean clients)
+domain='tvkdomain.cf'
 
 #Specify TVK host name for TVK UI
 tvkhost_name='tvkdemo.com'
 
-#Specify cluster name to get the kubeconfig for TVK UI. If not specified, cluster name is taken from current context.
+
+#Specify cluster name to get the kubeconfig for TVK UI. If not specified, cluster name is taken from current context.(specific for DigitalOcean clients)
 cluster_name='trilio-test2'
 
 #[Target creation parameters]
 
 #Whether or not TVK Target should be created [True, False]
-TARGET=True
+TARGET=true
 
 #Specify vendor name for s3 bucket ['Digital_Ocean','Amazon_AWS', 'Readymade_Minio', 'GCP']
-vendor_type='Readymade_Minio'
+vendor_type='GCP'
 
 #Specify DigitalOcean token [ https://cloud.digitalocean.com/account/api/tokens. ]
-doctl_token=''
+doctl_token='DO token'
 
 #Specify Target type ['NFS','S3']
 target_type='S3'
@@ -72,10 +73,10 @@ default_minio='Y'
 minio_server_namespace=''
 
 #Specify access_key for accessing/creating bucket/spaces
-access_key='access-key'
+access_key='<access_key>'
 
 #Specify secret key for accessing/creating bucket/spaces
-secret_key='secret-key'
+secret_key='<secret_key>'
 
 #Specify host_base for s3cmd command [know more - https://linux.die.net/man/1/s3cmd ]
 host_base=''
@@ -130,7 +131,7 @@ backup_name='trilio-test-backup'
 backup_namespace='trilio-test-backup'
 
 #Specify the way in which backup should be taken ['Label_based','Namespace_based','Operator_base','Helm_based']
-backup_way='Label_based'
+backup_way='Helm_based'
 
 #Whether or not restore should be performed [True, False]
 restore=True

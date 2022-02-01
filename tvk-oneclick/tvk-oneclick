@@ -165,7 +165,8 @@ install_tvk() {
       cmd="kubectl get sa $operatorSA -n $tvk_ns 2>> >(logit)"
       wait_install 10 "$cmd"
       kubectl get sa $operatorSA -n $tvk_ns 2>> >(logit) 1>> >(logit)
-      if [[ $? == 0 ]];then
+      ret_code=$?
+      if [[ $ret_code == 0 ]];then
         kubectl get sa -n "$tvk_ns" | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-scc-to-user anyuid -z '{}' -n "$tvk_ns" 1>> >(logit) 2>> >(logit)
         kubectl get sa -n "$tvk_ns" | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-cluster-role-to-user cluster-admin  -z '{}' -n "$tvk_ns" 1>> >(logit) 2>> >(logit)
       else
@@ -315,8 +316,9 @@ EOF
       if [ "$open_flag" -eq 1 ]; then
         cmd="kubectl get sa $tvkmanagerSA -n $tvk_ns 2>> >(logit)"
         wait_install 10 "$cmd"
-        kubectl get sa $tvkmanagerSA -n $tvk_ns 2>> >(logit) 1>> >(logit)
-        if [[ $? == 0 ]];then
+        kubectl get sa "$tvkmanagerSA" -n "$tvk_ns" 2>> >(logit) 1>> >(logit)
+	retcode=$?
+        if [[ $retcode == 0 ]];then
           kubectl get sa -n "$tvk_ns" | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-scc-to-user anyuid -z '{}' -n "$tvk_ns" 1>> >(logit) 2>> >(logit)
           kubectl get sa -n "$tvk_ns" | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-cluster-role-to-user cluster-admin  -z '{}' -n "$tvk_ns" 1>> >(logit) 2>> >(logit)
         else
@@ -542,8 +544,9 @@ EOF
   else
     if [ "$open_flag" -eq 1 ]; then
       while true; do
-        kubectl get sa $tvkmanagerSA -n $tvk_ns 2>> >(logit) 1>> >(logit)
-        if [[ $? == 0 ]];then
+        kubectl get sa "$tvkmanagerSA" -n "$tvk_ns" 2>> >(logit) 1>> >(logit)
+	return_val=$?
+        if [[ $return_val == 0 ]];then
           kubectl get sa -n "$tvk_ns" | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-scc-to-user anyuid -z '{}' -n "$tvk_ns" 1>> >(logit) 2>> >(logit)
           kubectl get sa -n "$tvk_ns" | sed -n '1!p' | awk '{print $1, $8}' | sed 's/ //g' | xargs -I '{}' oc adm policy add-cluster-role-to-user cluster-admin  -z '{}' -n "$tvk_ns" 1>> >(logit) 2>> >(logit)
           break
@@ -901,7 +904,6 @@ EOF
     echo "Loadbalancer taking time to get External IP"
     return 1
   fi
-  #set -x
   external_ip=$(kubectl get svc "$ingressGateway" -n "$get_ns" -o 'jsonpath={.status.loadBalancer.ingress[0].ip}' 2>> >(logit))
   if [[ -z "$external_ip" ]]; then
     hostname=$(kubectl get svc "$ingressGateway" -n "$get_ns" -o 'jsonpath={.status.loadBalancer.ingress[0].hostname}' 2>> >(logit))
@@ -909,7 +911,7 @@ EOF
       echo "ExternalIP is not set, please check configurations"
       return 1
     fi
-    external_ip=$(dig a4acb73d911624f8fa61dc339209a2da-588655396.us-east-1.elb.amazonaws.com +short | awk 'NR==2 {print $1}' 2>> >(logit))
+    external_ip=$(dig "$hostname" +short | awk 'NR==2 {print $1}' 2>> >(logit))
    # Do what you want
   fi
   if [[ $ret_val != 2 ]] && [[ $ret_val != 1 ]]; then
@@ -1471,7 +1473,6 @@ create_readymade_minio() {
   #create pod to run minio clinet command
   rand_name=$(head /dev/urandom | tr -dc a-z0-9 | head -c5)
   mc_pod_nm="minio-$rand_name"
-  echo $mc_pod_nm
   ret_val=$(kubectl run "$mc_pod_nm" --image=minio/mc -n "$minio_server_namespace" --restart=Never --command -- /bin/sh -c 'while true; do sleep 5s; done' 1>> >(logit) 2>> >(logit))
   ret_code=$?
   if [[ "$ret_code" -ne 0 ]]; then
@@ -1487,7 +1488,7 @@ create_readymade_minio() {
     open_flag=1
   fi
   echo "Waiting for minio client pod to be in Ready state.."
-  cmd="kubectl get pod $mc_pod_nm -n "$minio_server_namespace" -o jsonpath='{.status.phase}' 2>/dev/null | grep -e Running"
+  cmd="kubectl get pod $mc_pod_nm -n $minio_server_namespace -o jsonpath='{.status.phase}' 2>/dev/null | grep -e Running"
   wait_install 10 "$cmd"
   if ! kubectl get pod "$mc_pod_nm" -n "$minio_server_namespace" -o jsonpath="{.status.phase}" | grep -q Running; then
     echo "Minio client container taking more time than usual to be in Ready state, Exiting.."
